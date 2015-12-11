@@ -19,19 +19,19 @@
          (bullets (ring:new limit))
          (bullet-layer (window 'make-layer))
          (add-bullet!
-           (lambda (bullet-adt)
+           (lambda (bullet-id)
              (let ((bullet-tile (make-bitmap-tile "images/bullet.png"
                                                   "images/bullet-mask.png")))
-               (ring:add! bullets (cons bullet-adt bullet-tile))
+               (ring:add! bullets (cons bullet-id bullet-tile))
                ((bullet-layer 'add-drawable) bullet-tile))))
          (take-bullet
-           (lambda (bullet-adt)
-             (cdr (ring:assoc bullet-adt bullets))))
+           (lambda (bullet-id)
+             (cdr (ring:assoc bullet-id bullets))))
          (draw-bullet!
            (lambda (bullet-adt)
              (let ((pos-x (* width  (bullet-adt 'pos-x)))
                    (pos-y (* height (bullet-adt 'pos-y)))
-                   (tile  (take-bullet bullet-adt)))
+                   (tile  (take-bullet (bullet-adt 'id))))
                ((tile 'set-x!) pos-x)
                ((tile 'set-y!) pos-y))))
          (set-game-loop-fun!
@@ -40,10 +40,14 @@
          (set-key-fun!
            (lambda (f)
              ((window 'set-key-callback!) f)))
+         (set-key-release-fun!
+           (lambda (f)
+             ((window 'set-key-release-callback!) f)))
          (dispatch
            (lambda (msg (opt #f))
              (case msg
                ((set-game-loop-fun!) (set-game-loop-fun! opt))
+               ((set-key-release-fun!) (set-key-release-fun! opt))
                ((set-key-fun!) (set-key-fun! opt))
                ((add-bullet!) (add-bullet! opt))
                ((draw-rocket!) (draw-rocket! opt))

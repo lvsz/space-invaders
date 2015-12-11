@@ -16,11 +16,10 @@
         (size (mcdr ring-object)))
     (do ((i 0 (+ i 1))
          (r ring (mcdr r)))
-      ((> i size))
+      ((= i size))
       (when (mcar r) (f (mcar r))))))
 
 (define (assoc v ring-object)
-  (displayln (mcar ring-object))
   (let ((ring (mcar ring-object))
         (size (mcdr ring-object)))
     (let loop ((i 0) (r ring))

@@ -45,6 +45,7 @@
          (previous-time (current-milliseconds))
          ;; Define our dummy keyboard-callback
          (keyboard-callback (lambda (ev) (void)))
+         (key-release-callback (lambda (ev) (void)))
          ;; Define our dummy update-callback
          (update-callback (lambda (ev) (void)))
          (buffer-bitmap (make-object bitmap% w h))
@@ -92,7 +93,8 @@
         ;; Define overriding method to handle keyboard events
         ;; this makes sure our own key-callback is called.
         (define/override (on-char event)
-          (keyboard-callback (send event get-key-code)))
+          (keyboard-callback (send event get-key-code))
+          (key-release-callback (send event get-key-release-code)))
         ;; Call the superclass init, passing on all init args
         (super-new)))
     
@@ -174,6 +176,7 @@
       (cond ((eq? msg 'make-layer) (add-layer))
             ((eq? msg 'set-background!) set-background!)
             ((eq? msg 'set-key-callback!) (lambda (eh) (set! keyboard-callback eh)))
+            ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
             ((eq? msg 'set-update-callback!) (lambda (gl) (set! update-callback gl)))
             (else (raise-arguments-error 'window
                                          "wrong message sent"
