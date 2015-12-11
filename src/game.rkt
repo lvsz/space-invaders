@@ -14,10 +14,10 @@
 (define unit-width  (/ px-unit-width  window-width))
 (define unit-height (/ px-unit-height window-height))
 
-(define rocket-width  (* 30 unit-width))
-(define rocket-height (* 18 unit-height))
-(define bullet-width  (* 4 unit-width))
-(define bullet-height (* 7 unit-height))
+(define rocket-width  (* 13 unit-width))
+(define rocket-height (*  8 unit-height))
+(define bullet-width  (*  1 unit-width))
+(define bullet-height (*  7 unit-height))
 
 (define rocket-speed 15)
 (define bullet-speed 15)
@@ -35,11 +35,14 @@
            (lambda (y)
              (set! pos-y y)))
          (direction!
-           (lambda (key)
-             (case key
-               ((left)  (set! direction -1))
-               ((right) (set! direction  1))
-               (else    (set! direction  0)))))
+           (let ((left  #f)
+                 (right #f))
+             (lambda (key status)
+               (case key
+                 ((left)  (set! left  status))
+                 ((right) (set! right status)))
+               (set! direction (+ (if left -1 0)
+                                  (if right 1 0))))))
          (move!
            (lambda ()
              (set-x! (+ pos-x (* direction unit-width)))))
@@ -48,7 +51,7 @@
              (case msg
                ((pos-x) pos-x)
                ((pos-y) pos-y)
-               ((direction!) (direction! opt))
+               ((direction!) (apply direction! opt))
                ((move!) (move!))
                (else (error "unknown rocket-adt command:" msg)))))
          (draw!
@@ -129,12 +132,12 @@
                     (reload-time 0)
                     (game-loop-fun
                       (lambda (delta-t)
+                        (when shooting?
+                          (shoot!))
                         (set! reload-time (+ reload-time delta-t))
                         (when (> reload-time reload-timer)
                           (set! loaded? #t)
                           (set! reload-time 0))
-                        (when shooting?
-                          (shoot!))
                         (set! rocket-time (+ rocket-time delta-t))
                         (when (> rocket-time rocket-speed)
                           (rocket 'move!)
@@ -149,13 +152,15 @@
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #t))
-                          ((left right) (rocket 'direction! key))
-                          ((escape)     (exit)))))
+                          ((left)   (rocket 'direction! '(left #t)))
+                          ((right)  (rocket 'direction! '(right #t)))
+                          ((escape) (exit)))))
                     (release-fun
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #f))
-                          ((left right) (rocket 'direction! 0))))))
+                          ((left)  (rocket 'direction! '(left #f)))
+                          ((right) (rocket 'direction! '(right #f)))))))
                (render 'set-game-loop-fun! game-loop-fun)
                (render 'set-key-release-fun! release-fun)
                (render 'set-key-fun! key-fun))))
