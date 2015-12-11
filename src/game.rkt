@@ -24,7 +24,7 @@
 (define bullet-limit 20)
 (define reload-timer 1000)
 
-(define (rocket-adt)
+(define (rocket-adt (id #f))
   (let* ((pos-x (- 1/2 (/ rocket-width 2)))
          (pos-y 9/10)
          (direction 0)
@@ -49,6 +49,7 @@
          (dispatch-rocket
            (lambda (msg (opt #f))
              (case msg
+               ((id) id)
                ((pos-x) pos-x)
                ((pos-y) pos-y)
                ((direction!) (apply direction! opt))
@@ -56,15 +57,14 @@
                (else (error "unknown rocket-adt command:" msg)))))
          (draw!
            (lambda (render)
-             (render 'draw-rocket! dispatch-rocket))))
+             (render 'draw! (list id pos-x pos-y)))))
     (lambda args
       (if (eq? (car args) 'draw!)
         (apply draw! (cdr args))
         (apply dispatch-rocket args)))))
 
-(define (bullet-adt x y)
-  (let* ((id (gensym))
-         (exploded? #f)
+(define (bullet-adt x y (id #f))
+  (let* ((exploded? #f)
          (explode!
            (lambda ()
              (set! exploded? #t)))
@@ -81,7 +81,7 @@
                ((move!) (unless exploded? (move!))))))
          (draw!
            (lambda (render)
-             (render 'draw-bullet! dispatch-bullet))))
+             (render 'draw! (list id x y)))))
     (lambda args
       (if (eq? (car args) 'draw!)
         (apply draw! (cdr args))
@@ -90,10 +90,8 @@
 (define (bullets-adt)
   (let* ((bullets (ring:new bullet-limit))
          (shoot!
-           (lambda (x y)
-             (let ((new-bullet (bullet-adt x y)))
-               (ring:add! bullets new-bullet)
-               new-bullet)))
+           (lambda (x y (id #f))
+             (ring:add! bullets (bullet-adt x y id))))
          (move!
            (lambda ()
              (ring:for-each (lambda (b) (b 'move!)) bullets)))
@@ -111,9 +109,9 @@
         (apply dispatch args)))))
 
 (define (game-init)
-  (let* ((rocket (rocket-adt))
+  (let* ((render (render-init "main" window-width window-height))
+         (rocket (rocket-adt (render 'rocket-id)))
          (bullets (bullets-adt))
-         (render (render-init "main" window-width window-height bullet-limit))
          (loaded? #t)
          (shooting? #f)
          (shoot!
@@ -122,9 +120,8 @@
                (set! loaded? #f)
                (let* ((x (- (+ (rocket 'pos-x) (/ rocket-width 2))
                             (/ bullet-width 2)))
-                      (y (- (rocket 'pos-y) rocket-height))
-                      (new-bullet (bullets 'shoot! x y)))
-                 (render 'add-bullet! (new-bullet 'id))))))
+                      (y (- (rocket 'pos-y) rocket-height)))
+                 (bullets 'shoot! x y (render 'bullet-id))))))
          (start
            (lambda ()
              (let* ((rocket-time 0)
