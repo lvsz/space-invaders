@@ -3,8 +3,6 @@
 (require "render.rkt"
          (prefix-in ring: "ring.rkt"))
 
-;(provide game-init)
-
 (define window-width 224)
 (define window-height 256)
 
@@ -35,33 +33,31 @@
            (lambda (y)
              (set! pos-y y)))
          (direction!
-           (let ((left  #f)
-                 (right #f))
-             (lambda (key status)
+           (let ((left?  #f)
+                 (right? #f))
+             (lambda (key pressed?)
                (case key
-                 ((left)  (set! left  status))
-                 ((right) (set! right status)))
-               (set! direction (+ (if left -1 0)
-                                  (if right 1 0))))))
+                 ((left)  (set! left?  pressed?))
+                 ((right) (set! right? pressed?)))
+               (set! direction (+ (if left? -1 0)
+                                  (if right? 1 0))))))
          (move!
            (lambda ()
              (set-x! (+ pos-x (* direction unit-width)))))
+         (draw!
+           (lambda (render)
+             (render 'draw! (list id pos-x pos-y))))
          (dispatch-rocket
-           (lambda (msg (opt #f))
+           (lambda (msg . opt)
              (case msg
                ((id) id)
                ((pos-x) pos-x)
                ((pos-y) pos-y)
                ((direction!) (apply direction! opt))
                ((move!) (move!))
-               (else (error "unknown rocket-adt command:" msg)))))
-         (draw!
-           (lambda (render)
-             (render 'draw! (list id pos-x pos-y)))))
-    (lambda args
-      (if (eq? (car args) 'draw!)
-        (apply draw! (cdr args))
-        (apply dispatch-rocket args)))))
+               ((draw!) (apply draw! opt))
+               (else (error "unknown rocket-adt command:" msg))))))
+    dispatch-rocket))
 
 (define (bullet-adt x y (id #f))
   (let* ((exploded? #f)
@@ -71,21 +67,19 @@
          (move!
            (lambda ()
              (set! y (- y unit-height))))
+         (draw!
+           (lambda (render)
+             (render 'draw! (list id x y))))
          (dispatch-bullet
-           (lambda (msg (opt #f))
+           (lambda (msg . opt)
              (case msg
                ((id) id)
                ((pos-x) x)
                ((pos-y) y)
                ((explode!) (explode!))
-               ((move!) (unless exploded? (move!))))))
-         (draw!
-           (lambda (render)
-             (render 'draw! (list id x y)))))
-    (lambda args
-      (if (eq? (car args) 'draw!)
-        (apply draw! (cdr args))
-        (apply dispatch-bullet args)))))
+               ((move!) (unless exploded? (move!)))
+               ((draw!) (apply draw! opt))))))
+    dispatch-bullet))
 
 (define (bullets-adt)
   (let* ((bullets (ring:new bullet-limit))
@@ -102,11 +96,9 @@
            (lambda (msg . opt)
              (case msg
                ((shoot!) (apply shoot! opt))
-               ((move!) (move!))))))
-    (lambda args
-      (if (eq? (car args) 'draw!)
-        (apply draw! (cdr args))
-        (apply dispatch args)))))
+               ((move!) (move!))
+               ((draw!) (apply draw! opt))))))
+    dispatch))
 
 (define (game-init)
   (let* ((render (render-init "main" window-width window-height))
@@ -149,15 +141,15 @@
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #t))
-                          ((left)   (rocket 'direction! '(left #t)))
-                          ((right)  (rocket 'direction! '(right #t)))
+                          ((left)   (rocket 'direction! 'left #t))
+                          ((right)  (rocket 'direction! 'right #t))
                           ((escape) (exit)))))
                     (release-fun
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #f))
-                          ((left)  (rocket 'direction! '(left #f)))
-                          ((right) (rocket 'direction! '(right #f)))))))
+                          ((left)  (rocket 'direction! 'left #f))
+                          ((right) (rocket 'direction! 'right #f))))))
                (render 'set-game-loop-fun! game-loop-fun)
                (render 'set-key-release-fun! release-fun)
                (render 'set-key-fun! key-fun))))
