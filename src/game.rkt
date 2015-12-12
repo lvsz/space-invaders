@@ -19,8 +19,89 @@
 
 (define rocket-speed 15)
 (define bullet-speed 15)
+(define alien-speed  15)
 (define bullet-limit 20)
 (define reload-timer 1000)
+
+(define aliens/column 5)
+(define aliens/row 11)
+(define alien-width (* 12 unit-width))
+(define alien-height (* 8 unit-height))
+
+(define (alien-adt x y id)
+  (let* ((alive? #t)
+         (move!
+           (lambda (direction)
+             (case direction
+               ((left)  (set! x (- x unit-width)))
+               ((right) (set! x (+ x unit-width)))
+               ((down)  (set! y (+ y alien-height))))))
+         (draw!
+           (lambda (render)
+             (render 'draw! (list id x y))))
+         (dispatch-alien
+           (lambda (msg . opt)
+             (case msg
+               ((id) id)
+               ((pos-x) x)
+               ((pos-y) y)
+               ((alive?) alive?)
+               ((move!) (apply move! opt))
+               ((draw!) (apply draw! opt))))))
+    dispatch-alien))
+
+(define (alien-row x y make-id)
+  (let* ((aliens
+           (build-vector
+             aliens/row
+             (lambda (i)
+               (alien-adt (+ x (* 4/3 i alien-width)) y (make-id)))))
+         (first-alien
+           (lambda ()
+             ((vector-ref aliens 0) 'pos-x)))
+         (last-alien
+           (lambda ()
+             (+ alien-width ((vector-ref aliens 10) 'pos-x))))
+         (direction 'right)
+         (move!
+         (lambda ()
+           (cond
+             ((and (= 1 (last-alien))
+                   (eq? direction 'right))
+              (set! direction 'left)
+              (vector-map (lambda (a) (a 'move! 'down)) aliens))
+             ((and (= 0 (first-alien))
+                   (eq? direction 'left))
+              (set! direction 'right)
+              (vector-map (lambda (a) (a 'move! 'down)) aliens))
+             (else
+              (vector-map (lambda (a) (a 'move! direction)) aliens)))))
+         (draw!
+           (lambda (render)
+             (vector-map (lambda (alien) (alien 'draw! render)) aliens)))
+         (dispatch
+           (lambda (msg . opt)
+             (case msg
+               ((move!) (move!))
+               ((draw!) (apply draw! opt))))))
+    dispatch))
+
+(define (swarm-adt make-id)
+  (let* ((x 0)
+         (y 0)
+         (aliens (vector (alien-row x y make-id)))
+         (move!
+           (lambda ()
+             (vector-map (lambda (row) (row 'move!)) aliens)))
+         (draw!
+           (lambda (render)
+             (vector-map (lambda (row) (row 'draw! render)) aliens)))
+         (dispatch
+           (lambda (msg . opt)
+             (case msg
+               ((move!) (move!))
+               ((draw!) (apply draw! opt))))))
+    dispatch))
 
 (define (rocket-adt (id #f))
   (let* ((pos-x (- 1/2 (/ rocket-width 2)))
@@ -104,6 +185,7 @@
   (let* ((render (render-init "main" window-width window-height))
          (rocket (rocket-adt (render 'rocket-id)))
          (bullets (bullets-adt))
+         (aliens (swarm-adt (lambda () (render 'alien-id))))
          (loaded? #t)
          (shooting? #f)
          (shoot!
@@ -119,6 +201,7 @@
              (let* ((rocket-time 0)
                     (bullet-time 0)
                     (reload-time 0)
+                    (alien-time  0)
                     (game-loop-fun
                       (lambda (delta-t)
                         (when shooting?
@@ -135,8 +218,13 @@
                         (when (> bullet-time bullet-speed)
                           (bullets 'move!)
                           (set! bullet-time 0))
+                        (set! alien-time (+ alien-time delta-t))
+                        (when (> alien-time alien-speed)
+                          (aliens 'move!)
+                          (set! alien-time 0))
                         (rocket  'draw! render)
-                        (bullets 'draw! render)))
+                        (bullets 'draw! render)
+                        (aliens  'draw! render)))
                     (key-fun
                       (lambda (key)
                         (case key
