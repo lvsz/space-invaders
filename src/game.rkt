@@ -35,7 +35,7 @@
                ((down)  (set! y (+ y alien-height))))))
          (draw!
            (lambda (render)
-             (render 'draw! id x y)))
+             ((render 'draw!) id x y)))
          (dispatch-alien
            (lambda (msg . opt)
              (case msg
@@ -43,8 +43,8 @@
                ((pos-x) x)
                ((pos-y) y)
                ((alive?) alive?)
-               ((move!) (apply move! opt))
-               ((draw!) (apply draw! opt))))))
+               ((move!) move!)
+               ((draw!) draw!)))))
     dispatch-alien))
 
 (define (alien-row type x y make-id)
@@ -88,22 +88,22 @@
                  ((and (<= (first-alien) 0)
                        (eq? direction 'left))
                   (set! direction 'right)
-                  (vector-map (lambda (a) (a 'move! 'down)) aliens))
+                  (vector-map (lambda (a) ((a 'move!) 'down)) aliens))
                  ((and (>= (last-alien) 1)
                        (eq? direction 'right))
                   (set! direction 'left)
-                  (vector-map (lambda (a) (a 'move! 'down)) aliens))
+                  (vector-map (lambda (a) ((a 'move!) 'down)) aliens))
                  (else
-                  (vector-map (lambda (a) (a 'move! direction)) aliens))))))
+                  (vector-map (lambda (a) ((a 'move!) direction)) aliens))))))
          (draw!
            (lambda (render)
-             (vector-map (lambda (a) (a 'draw! render)) aliens)))
+             (vector-map (lambda (a) ((a 'draw!) render)) aliens)))
          (dispatch
-           (lambda (msg . opt)
+           (lambda (msg)
              (case msg
                ((alive?) alive?)
-               ((move!) (move!))
-               ((draw!) (apply draw! opt))))))
+               ((move!) move!)
+               ((draw!) draw!)))))
     dispatch))
 
 (define (swarm-adt make-id)
@@ -114,19 +114,20 @@
                          (alien-row 1 x (* 4 alien-height) make-id)))
          (move!
            (lambda ()
-             (vector-map (lambda (row) (row 'move!)) aliens)))
+             (vector-map (lambda (row) ((row 'move!))) aliens)))
          (draw!
            (lambda (render)
-             (vector-map (lambda (row) (row 'draw! render)) aliens)))
+             (vector-map (lambda (row) ((row 'draw!) render)) aliens)))
          (dispatch
-           (lambda (msg . opt)
+           (lambda (msg)
              (case msg
-               ((move!) (move!))
-               ((draw!) (apply draw! opt))))))
+               ((move!) move!)
+               ((draw!) draw!)))))
     dispatch))
 
-(define (rocket-adt (id #f))
-  (let* ((pos-x (- 1/2 (/ rocket-width 2)))
+(define (rocket-adt make-id)
+  (let* ((id (make-id))
+         (pos-x (- 1/2 (/ rocket-width 2)))
          (pos-y 9/10)
          (direction 0)
          (set-x!
@@ -149,21 +150,24 @@
              (set-x! (+ pos-x (* direction unit-width)))))
          (draw!
            (lambda (render)
-             (render 'draw! id pos-x pos-y)))
+             ((render 'draw!) id pos-x pos-y)))
          (dispatch-rocket
-           (lambda (msg . opt)
+           (lambda (msg)
              (case msg
                ((id) id)
                ((pos-x) pos-x)
                ((pos-y) pos-y)
-               ((direction!) (apply direction! opt))
-               ((move!) (move!))
-               ((draw!) (apply draw! opt))
+               ((direction!) direction!)
+               ((move!) move!)
+               ((draw!) draw!)
                (else (error "unknown rocket-adt command:" msg))))))
     dispatch-rocket))
 
-(define (bullet-adt x y (id #f))
-  (let* ((exploded? #t)
+(define (bullet-adt make-id)
+  (let* ((id (make-id))
+         (x 1)
+         (y 0)
+         (exploded? #t)
          (reset!
            (lambda (new-x new-y)
              (set! exploded? #f)
@@ -174,48 +178,49 @@
              (set! exploded? #t)))
          (move!
            (lambda ()
-             (set! y (- y unit-height))))
+             (unless exploded?
+               (set! y (- y unit-height)))))
          (draw!
            (lambda (render)
-             (render 'draw! id x y)))
+               ((render 'draw!) id x y)))
          (dispatch-bullet
-           (lambda (msg . opt)
+           (lambda (msg)
              (case msg
                ((id) id)
                ((pos-x) x)
                ((pos-y) y)
-               ((reset!) (apply reset! opt))
-               ((explode!) (explode!))
-               ((move!) (unless exploded? (move!)))
-               ((draw!) (apply draw! opt))))))
+               ((reset!) reset!)
+               ((explode!) explode!)
+               ((move!) move!)
+               ((draw!) draw!)))))
     dispatch-bullet))
 
 (define (bullets-adt make-id)
-  (let* ((bullets (build-ring bullet-limit (lambda (_) (bullet-adt 1 1 (make-id)))))
+  (let* ((bullets (build-ring bullet-limit (lambda (_) (bullet-adt make-id))))
          (shoot!
            (lambda (x y)
              (ring-next! bullets)
              (let ((bullet (ring-head bullets)))
-               (bullet 'reset! x y))))
+               ((bullet 'reset!) x y))))
          (move!
            (lambda ()
-             (ring-for-each (lambda (b) (b 'move!)) bullets)))
+             (ring-for-each (lambda (b) ((b 'move!))) bullets)))
          (draw!
            (lambda (render)
-             (ring-for-each (lambda (b) (b 'draw! render)) bullets)))
+             (ring-for-each (lambda (b) ((b 'draw!) render)) bullets)))
          (dispatch
-           (lambda (msg . opt)
+           (lambda (msg)
              (case msg
-               ((shoot!) (apply shoot! opt))
-               ((move!) (move!))
-               ((draw!) (apply draw! opt))))))
+               ((shoot!) shoot!)
+               ((move!) move!)
+               ((draw!) draw!)))))
     dispatch))
 
 (define (game-init)
   (let* ((render (render-init "main" window-width window-height))
          (rocket (rocket-adt (render 'rocket-id)))
-         (bullets (bullets-adt (lambda () (render 'bullet-id))))
-         (aliens (swarm-adt (lambda (type) (render 'alien-id type))))
+         (bullets (bullets-adt (render 'bullet-id)))
+         (aliens (swarm-adt (render 'alien-id)))
          (loaded? #t)
          (shooting? #f)
          (shoot!
@@ -225,7 +230,7 @@
                (let* ((x (- (+ (rocket 'pos-x) (/ rocket-width 2))
                             (/ bullet-width 2)))
                       (y (- (rocket 'pos-y) bullet-height)))
-                 (bullets 'shoot! x y)))))
+                 ((bullets 'shoot!) x y)))))
          (start
            (lambda ()
              (let* ((rocket-time 0)
@@ -242,41 +247,40 @@
                           (set! reload-time 0))
                         (set! rocket-time (+ rocket-time delta-t))
                         (when (> rocket-time rocket-speed)
-                          (rocket 'move!)
+                          ((rocket 'move!))
                           (set! rocket-time 0))
                         (set! bullet-time (+ bullet-time delta-t))
                         (when (> bullet-time bullet-speed)
-                          (bullets 'move!)
+                          ((bullets 'move!))
                           (set! bullet-time 0))
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time alien-speed)
-                          (aliens 'move!)
+                          ((aliens 'move!))
                           (set! alien-time 0))
-                        (rocket  'draw! render)
-                        (bullets 'draw! render)
-                        (aliens  'draw! render)))
+                        ((rocket  'draw!) render)
+                        ((bullets 'draw!) render)
+                        ((aliens  'draw!) render)))
                     (key-fun
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #t))
-                          ((left)   (rocket 'direction! 'left #t))
-                          ((right)  (rocket 'direction! 'right #t))
+                          ((left)   ((rocket 'direction!) 'left #t))
+                          ((right)  ((rocket 'direction!) 'right #t))
                           ((escape) (exit)))))
                     (release-fun
                       (lambda (key)
                         (case key
                           ((up #\space) (set! shooting? #f))
-                          ((left)  (rocket 'direction! 'left #f))
-                          ((right) (rocket 'direction! 'right #f))))))
-               (render 'set-game-loop-fun! game-loop-fun)
-               (render 'set-key-release-fun! release-fun)
-               (render 'set-key-fun! key-fun))))
+                          ((left)  ((rocket 'direction!) 'left #f))
+                          ((right) ((rocket 'direction!) 'right #f))))))
+               ((render 'set-game-loop-fun!) game-loop-fun)
+               ((render 'set-key-release-fun!) release-fun)
+               ((render 'set-key-fun!) key-fun))))
          (dispatch
            (lambda (msg)
              (case msg
-               ((start) (start))
-               (else (eval msg))))))
+               ((start) (start))))))
     dispatch))
 
-
-(define game (game-init)) (game 'start)
+(define game (game-init))
+(game 'start)
