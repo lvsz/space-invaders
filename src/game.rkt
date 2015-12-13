@@ -6,11 +6,8 @@
 (define window-width 224)
 (define window-height 256)
 
-(define px-unit-width 1)
-(define px-unit-height 1)
-
-(define unit-width  (/ px-unit-width  window-width))
-(define unit-height (/ px-unit-height window-height))
+(define unit-width  1/224)
+(define unit-height 1/256)
 
 (define rocket-width  (* 13 unit-width))
 (define rocket-height (*  8 unit-height))
