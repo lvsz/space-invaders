@@ -35,7 +35,7 @@
                ((down)  (set! y (+ y alien-height))))))
          (draw!
            (lambda (render)
-             (render 'draw! (list id x y))))
+             (render 'draw! id x y)))
          (dispatch-alien
            (lambda (msg . opt)
              (case msg
@@ -47,12 +47,12 @@
                ((draw!) (apply draw! opt))))))
     dispatch-alien))
 
-(define (alien-row x y make-id)
+(define (alien-row type x y make-id)
   (let* ((aliens
            (build-vector
              aliens/row
              (lambda (i)
-               (alien-adt (+ x (* 4/3 i alien-width)) y (make-id)))))
+               (alien-adt (+ x (* 4/3 i alien-width)) y (make-id type)))))
          (first-alien
            (lambda ()
              ((vector-ref aliens 0) 'pos-x)))
@@ -86,7 +86,9 @@
 (define (swarm-adt make-id)
   (let* ((x 0)
          (y 0)
-         (aliens (vector (alien-row x y make-id)))
+         (aliens (vector (alien-row 1 x y make-id)
+                         (alien-row 2 x 1/10 make-id)
+                         (alien-row 3 x 1/5 make-id)))
          (move!
            (lambda ()
              (vector-map (lambda (row) (row 'move!)) aliens)))
@@ -124,7 +126,7 @@
              (set-x! (+ pos-x (* direction unit-width)))))
          (draw!
            (lambda (render)
-             (render 'draw! (list id pos-x pos-y))))
+             (render 'draw! id pos-x pos-y)))
          (dispatch-rocket
            (lambda (msg . opt)
              (case msg
@@ -147,7 +149,7 @@
              (set! y (- y unit-height))))
          (draw!
            (lambda (render)
-             (render 'draw! (list id x y))))
+             (render 'draw! id x y)))
          (dispatch-bullet
            (lambda (msg . opt)
              (case msg
@@ -182,7 +184,7 @@
   (let* ((render (render-init "main" window-width window-height))
          (rocket (rocket-adt (render 'rocket-id)))
          (bullets (bullets-adt))
-         (aliens (swarm-adt (lambda () (render 'alien-id))))
+         (aliens (swarm-adt (lambda (type) (render 'alien-id type))))
          (loaded? #t)
          (shooting? #f)
          (shoot!

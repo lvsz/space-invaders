@@ -21,9 +21,14 @@
                ((bullet-layer 'add-drawable) bmp)
                bmp)))
          (alien-tile
-           (lambda ()
-             (let ((bmp (make-bitmap-tile "images/alien2-1.png"
-                                          "images/alien2-1-mask.png")))
+           (lambda (type)
+             (let ((bmp (case type
+                          ((1) (make-bitmap-tile "images/alien1-1.png"
+                                                 "images/alien1-1-mask.png"))
+                          ((2) (make-bitmap-tile "images/alien2-1.png"
+                                                 "images/alien2-1-mask.png"))
+                          ((3) (make-bitmap-tile "images/alien3-1.png"
+                                                 "images/alien3-1-mask.png")))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
          (draw!
@@ -42,15 +47,15 @@
            (lambda (f)
              ((window 'set-key-release-callback!) f)))
          (dispatch
-           (lambda (msg (opt #f))
+           (lambda (msg . opt)
              (case msg
-               ((set-game-loop-fun!) (set-game-loop-fun! opt))
-               ((set-key-release-fun!) (set-key-release-fun! opt))
-               ((set-key-fun!) (set-key-fun! opt))
+               ((set-game-loop-fun!) (apply set-game-loop-fun! opt))
+               ((set-key-release-fun!) (apply set-key-release-fun! opt))
+               ((set-key-fun!) (apply set-key-fun! opt))
                ((rocket-id) (rocket-tile))
                ((bullet-id) (bullet-tile))
-               ((alien-id)  (alien-tile))
-               ((draw!) (draw! (first opt) (second opt) (third opt)))
+               ((alien-id)  (apply alien-tile opt))
+               ((draw!) (apply draw! opt))
                (else (error "unkown-render-argument:" msg))))))
     ((window 'set-background!) "black")
     dispatch))
