@@ -1,7 +1,7 @@
 ;#lang racket
 
 (require "render.rkt"
-         (prefix-in ring: "ring.rkt"))
+         "ring.rkt")
 
 (define window-width 224)
 (define window-height 256)
@@ -61,35 +61,35 @@
            (let ((idx 0))
              (lambda ()
                (unless ((alien idx) 'alive?)
-                 (let loop ((i (add1 idx)))
+                 (let loop ((i (+ idx 1)))
                    (cond (((alien i) 'alive?)
                           (set! idx i))
                          ((= i aliens/row)
                           (set! alive? #f))
                          (else
-                          (loop (add1 i))))))
+                          (loop (+ i 1))))))
                  ((alien idx) 'pos-x))))
          (last-alien
-           (let ((idx (sub1 aliens/row)))
+           (let ((idx (- aliens/row 1)))
              (lambda ()
                (unless ((alien idx) 'alive?)
-                 (let loop ((i (sub1 idx)))
+                 (let loop ((i (- idx 1)))
                    (cond (((alien i) 'alive?)
                           (set! idx i))
                          ((= i 0)
                           (set! alive? #f))
                          (else
-                           (loop (sub1 i))))))
+                           (loop (- i 1))))))
                (+ alien-width ((alien idx) 'pos-x)))))
          (move!
            (let ((direction 'right))
              (lambda ()
                (cond
-                 ((and (>= 0 (first-alien))
+                 ((and (<= (first-alien) 0)
                        (eq? direction 'left))
                   (set! direction 'right)
                   (vector-map (lambda (a) (a 'move! 'down)) aliens))
-                 ((and (<= 1 (last-alien))
+                 ((and (>= (last-alien) 1)
                        (eq? direction 'right))
                   (set! direction 'left)
                   (vector-map (lambda (a) (a 'move! 'down)) aliens))
@@ -109,9 +109,9 @@
 (define (swarm-adt make-id)
   (let* ((x 0)
          (y 0)
-         (aliens (vector (alien-row 1 x y make-id)
-                         (alien-row 2 x 1/10 make-id)
-                         (alien-row 3 x 1/5 make-id)))
+         (aliens (vector (alien-row 3 x y make-id)
+                         (alien-row 2 x (* 2 alien-height) make-id)
+                         (alien-row 1 x (* 4 alien-height) make-id)))
          (move!
            (lambda ()
              (vector-map (lambda (row) (row 'move!)) aliens)))
@@ -163,7 +163,12 @@
     dispatch-rocket))
 
 (define (bullet-adt x y (id #f))
-  (let* ((exploded? #f)
+  (let* ((exploded? #t)
+         (reset!
+           (lambda (new-x new-y)
+             (set! exploded? #f)
+             (set! x new-x)
+             (set! y new-y)))
          (explode!
            (lambda ()
              (set! exploded? #t)))
@@ -179,22 +184,25 @@
                ((id) id)
                ((pos-x) x)
                ((pos-y) y)
+               ((reset!) (apply reset! opt))
                ((explode!) (explode!))
                ((move!) (unless exploded? (move!)))
                ((draw!) (apply draw! opt))))))
     dispatch-bullet))
 
-(define (bullets-adt)
-  (let* ((bullets (ring:new bullet-limit))
+(define (bullets-adt make-id)
+  (let* ((bullets (build-ring bullet-limit (lambda (_) (bullet-adt 1 1 (make-id)))))
          (shoot!
-           (lambda (x y (id #f))
-             (ring:add! bullets (bullet-adt x y id))))
+           (lambda (x y)
+             (ring-next! bullets)
+             (let ((bullet (ring-head bullets)))
+               (bullet 'reset! x y))))
          (move!
            (lambda ()
-             (ring:for-each (lambda (b) (b 'move!)) bullets)))
+             (ring-for-each (lambda (b) (b 'move!)) bullets)))
          (draw!
            (lambda (render)
-             (ring:for-each (lambda (b) (b 'draw! render)) bullets)))
+             (ring-for-each (lambda (b) (b 'draw! render)) bullets)))
          (dispatch
            (lambda (msg . opt)
              (case msg
@@ -206,7 +214,7 @@
 (define (game-init)
   (let* ((render (render-init "main" window-width window-height))
          (rocket (rocket-adt (render 'rocket-id)))
-         (bullets (bullets-adt))
+         (bullets (bullets-adt (lambda () (render 'bullet-id))))
          (aliens (swarm-adt (lambda (type) (render 'alien-id type))))
          (loaded? #t)
          (shooting? #f)
@@ -216,8 +224,8 @@
                (set! loaded? #f)
                (let* ((x (- (+ (rocket 'pos-x) (/ rocket-width 2))
                             (/ bullet-width 2)))
-                      (y (- (rocket 'pos-y) rocket-height)))
-                 (bullets 'shoot! x y (render 'bullet-id))))))
+                      (y (- (rocket 'pos-y) bullet-height)))
+                 (bullets 'shoot! x y)))))
          (start
            (lambda ()
              (let* ((rocket-time 0)
