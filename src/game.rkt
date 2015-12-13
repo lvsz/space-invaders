@@ -48,37 +48,60 @@
     dispatch-alien))
 
 (define (alien-row type x y make-id)
-  (let* ((aliens
+  (let* ((alive? #t)
+         (aliens
            (build-vector
              aliens/row
              (lambda (i)
                (alien-adt (+ x (* 4/3 i alien-width)) y (make-id type)))))
+         (alien
+           (lambda (idx)
+             (vector-ref aliens idx)))
          (first-alien
-           (lambda ()
-             ((vector-ref aliens 0) 'pos-x)))
+           (let ((idx 0))
+             (lambda ()
+               (unless ((alien idx) 'alive?)
+                 (let loop ((i (add1 idx)))
+                   (cond (((alien i) 'alive?)
+                          (set! idx i))
+                         ((= i aliens/row)
+                          (set! alive? #f))
+                         (else
+                          (loop (add1 i))))))
+                 ((alien idx) 'pos-x))))
          (last-alien
-           (lambda ()
-             (+ alien-width ((vector-ref aliens 10) 'pos-x))))
-         (direction 'right)
+           (let ((idx (sub1 aliens/row)))
+             (lambda ()
+               (unless ((alien idx) 'alive?)
+                 (let loop ((i (sub1 idx)))
+                   (cond (((alien i) 'alive?)
+                          (set! idx i))
+                         ((= i 0)
+                          (set! alive? #f))
+                         (else
+                           (loop (sub1 i))))))
+               (+ alien-width ((alien idx) 'pos-x)))))
          (move!
-         (lambda ()
-           (cond
-             ((and (= 1 (last-alien))
-                   (eq? direction 'right))
-              (set! direction 'left)
-              (vector-map (lambda (a) (a 'move! 'down)) aliens))
-             ((and (= 0 (first-alien))
-                   (eq? direction 'left))
-              (set! direction 'right)
-              (vector-map (lambda (a) (a 'move! 'down)) aliens))
-             (else
-              (vector-map (lambda (a) (a 'move! direction)) aliens)))))
+           (let ((direction 'right))
+             (lambda ()
+               (cond
+                 ((and (>= 0 (first-alien))
+                       (eq? direction 'left))
+                  (set! direction 'right)
+                  (vector-map (lambda (a) (a 'move! 'down)) aliens))
+                 ((and (<= 1 (last-alien))
+                       (eq? direction 'right))
+                  (set! direction 'left)
+                  (vector-map (lambda (a) (a 'move! 'down)) aliens))
+                 (else
+                  (vector-map (lambda (a) (a 'move! direction)) aliens))))))
          (draw!
            (lambda (render)
-             (vector-map (lambda (alien) (alien 'draw! render)) aliens)))
+             (vector-map (lambda (a) (a 'draw! render)) aliens)))
          (dispatch
            (lambda (msg . opt)
              (case msg
+               ((alive?) alive?)
                ((move!) (move!))
                ((draw!) (apply draw! opt))))))
     dispatch))
