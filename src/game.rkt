@@ -1,7 +1,9 @@
-;#lang racket
+#lang racket
 
 (require "render.rkt"
          "ring.rkt")
+
+(provide (all-defined-out))
 
 (define window-width 224)
 (define window-height 256)
@@ -16,7 +18,7 @@
 
 (define rocket-speed 15)
 (define bullet-speed 15)
-(define alien-speed  15)
+(define alien-speed  1000)
 (define bullet-limit 20)
 (define reload-timer 1000)
 
@@ -32,12 +34,13 @@
              (set! alive? #f)
              100))
          (move!
-           (lambda (direction)
-             (when alive?
-             (case direction
-               ((left)  (set! x (- x unit-width)))
-               ((right) (set! x (+ x unit-width)))
-               ((down)  (set! y (+ y alien-height)))))))
+           (let ((x-diff (* 2 unit-width)))
+             (lambda (direction)
+               (when alive?
+                 (case direction
+                   ((left)  (set! x (- x x-diff)))
+                   ((right) (set! x (+ x x-diff)))
+                   ((down)  (set! y (+ y alien-height))))))))
          (draw!
            (lambda (render)
              ((render 'draw!) id x y)
@@ -93,13 +96,14 @@
              (let bsearch ((i 0) (j 10))
                (if (> i j)
                  #f
-                 (let* ((aln (alien (+ i (quotient (- j i) 2))))
+                 (let* ((mid  (quotient (+ i j) 2))
+                        (aln  (alien mid))
                         (a-x1 (aln 'x))
                         (a-x2 (+ a-x1 alien-width)))
                    (cond ((< b-x a-x1)
-                          (bsearch i (- j (quotient (- j i) 2) 1)))
+                          (bsearch i (- mid 1)))
                          ((> b-x a-x2)
-                          (bsearch (+ i (quotient (- j i) 2)) j))
+                          (bsearch (+ mid 1) j))
                          ((aln 'alive?)
                           ((aln 'kill!)))
                          (else #f)))))))
@@ -160,13 +164,13 @@
       ;                 (+ (max right right-bound) alien-width))
       ;           (loop (+ i 1) (min left left-bound) (max right right-bound)))))))
          (shot!
-           (lambda (s-x s-y)
+           (lambda (b-x b-y)
              (let loop ((i bottom))
                (let* ((a-row (vector-ref aliens i))
                       (a-y (a-row 'y)))
-                 (cond ((and (>= s-y a-y)
-                             (<= s-y (+ a-y alien-height)))
-                        ((a-row 'shot!) x))
+                 (cond ((and (>= b-y a-y)
+                             (<= b-y (+ a-y alien-height)))
+                        ((a-row 'shot!) b-x))
                        ((= i top) #f)
                        (else (loop (+ i 1))))))))
          (move!
@@ -341,10 +345,10 @@
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time alien-speed)
                           ((aliens 'move!))
-                          (set! alien-time 0))
+                          (set! alien-time 0)
+                          ((aliens  'draw!) render))
                         ((rocket  'draw!) render)
-                        ((bullets 'draw!) render)
-                        ((aliens  'draw!) render)))
+                        ((bullets 'draw!) render)))
                     (key-fun
                       (lambda (key)
                         (case key
