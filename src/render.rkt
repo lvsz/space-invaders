@@ -11,24 +11,24 @@
          (alien-layer  (window 'make-layer))
          (rocket-tile
            (lambda ()
-             (let ((bmp (make-bitmap-tile "images/rocket.png"
-                                          "images/rocket-mask.png")))
+             (let ((bmp (make-bitmap-tile "../gfx/rocket.png"
+                                          "../gfx/rocket-mask.png")))
                ((rocket-layer 'add-drawable) bmp)
                bmp)))
          (bullet-tile
            (lambda ()
-             (let ((bmp (make-bitmap-tile "images/bullet.png")))
+             (let ((bmp (make-bitmap-tile "../gfx/bullet.png")))
                ((bullet-layer 'add-drawable) bmp)
                bmp)))
          (alien-tile
            (lambda (type)
              (let ((bmp (case type
-                          ((1) (make-bitmap-tile "images/alien1-1.png"
-                                                 "images/alien1-1-mask.png"))
-                          ((2) (make-bitmap-tile "images/alien2-1.png"
-                                                 "images/alien2-1-mask.png"))
-                          ((3) (make-bitmap-tile "images/alien3-1.png"
-                                                 "images/alien3-1-mask.png")))))
+                          ((1) (make-bitmap-tile "../gfx/alien1-1.png"
+                                                 "../gfx/alien1-1-mask.png"))
+                          ((2) (make-bitmap-tile "../gfx/alien2-1.png"
+                                                 "../gfx/alien2-1-mask.png"))
+                          ((3) (make-bitmap-tile "../gfx/alien3-1.png"
+                                                 "../gfx/alien3-1-mask.png")))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
          (draw!
