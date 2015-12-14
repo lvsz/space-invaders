@@ -27,12 +27,17 @@
 
 (define (alien-adt x y id)
   (let* ((alive? #t)
+         (kill!
+           (lambda ()
+             (set! alive? #f)
+             100))
          (move!
            (lambda (direction)
+             (when alive?
              (case direction
                ((left)  (set! x (- x unit-width)))
                ((right) (set! x (+ x unit-width)))
-               ((down)  (set! y (+ y alien-height))))))
+               ((down)  (set! y (+ y alien-height)))))))
          (draw!
            (lambda (render)
              ((render 'draw!) id x y)))
@@ -40,9 +45,10 @@
            (lambda (msg . opt)
              (case msg
                ((id) id)
-               ((pos-x) x)
-               ((pos-y) y)
+               ((x) x)
+               ((y) y)
                ((alive?) alive?)
+               ((kill!) kill!)
                ((move!) move!)
                ((draw!) draw!)))))
     dispatch-alien))
@@ -68,7 +74,7 @@
                           (set! alive? #f))
                          (else
                           (loop (+ i 1))))))
-                 ((alien idx) 'pos-x))))
+                 ((alien idx) 'x))))
          (last-alien
            (let ((idx (- aliens/row 1)))
              (lambda ()
@@ -80,7 +86,22 @@
                           (set! alive? #f))
                          (else
                            (loop (- i 1))))))
-               (+ alien-width ((alien idx) 'pos-x)))))
+               (+ alien-width ((alien idx) 'x)))))
+         (shot!
+           (lambda (b-x)
+             (let bsearch ((i 0) (j 10))
+               (if (> i j)
+                 #f
+                 (let* ((aln (alien (+ i (quotient (- j i) 2))))
+                        (a-x1 (aln 'x))
+                        (a-x2 (+ a-x1 alien-width)))
+                   (cond ((< b-x a-x1)
+                          (bsearch i (- j (quotient (- j i) 2) 1)))
+                         ((> b-x a-x2)
+                          (bsearch (+ i (quotient (- j i) 2)) j))
+                         ((aln 'alive?)
+                          ((aln 'kill!)))
+                         (else #f)))))))
          (move!
            (let ((direction 'right))
              (lambda ()
@@ -101,7 +122,9 @@
          (dispatch
            (lambda (msg)
              (case msg
+               ((y) y)
                ((alive?) alive?)
+               ((shot!) shot!)
                ((move!) move!)
                ((draw!) draw!)))))
     dispatch))
@@ -114,6 +137,37 @@
                          (alien-row 2 x (* 5 alien-height) make-id)
                          (alien-row 2 x (* 3 alien-height) make-id)
                          (alien-row 3 x (* 1 alien-height) make-id)))
+         (top 4)
+         (bottom 0)
+      ;   (x-bounds
+      ;     (lambda ()
+      ;       (unless ((vector-ref aliens bottom) 'alive?)
+      ;         (do ((i (+ bottom 1) (+ i 1)))
+      ;           (((vector-ref aliens i) 'alive?) (set! bottom i))))
+      ;       (unless ((vector-ref aliens top) 'alive?)
+      ;         (do ((i (- top 1) (- i 1)))
+      ;           (((vector-ref aliens i) 'alive?) (set! top i))))
+      ;       (cons (+ ((vector-ref aliens top) 'x) alien-height)
+      ;             (+ ((vector-ref aliens bottom 'x) alien-height)))))
+      ;   (y-bounds
+      ;     (lambda ()
+      ;     (let loop ((i bottom) (left 1) (right 0))
+      ;       (let ((left-bound 0); ((vector-ref aliens i) 'left-bound))
+      ;             (right-bound 10)); ((vector-ref aliens i) 'right-bound)))
+      ;         (if (= i top)
+      ;           (cons (min left left-bound)
+      ;                 (+ (max right right-bound) alien-width))
+      ;           (loop (+ i 1) (min left left-bound) (max right right-bound)))))))
+         (shot!
+           (lambda (s-x s-y)
+             (let loop ((i bottom))
+               (let* ((a-row (vector-ref aliens i))
+                      (a-y (a-row 'y)))
+                 (cond ((and (>= s-y a-y)
+                             (<= s-y (+ a-y alien-height)))
+                        ((a-row 'shot!) x))
+                       ((= i top) #f)
+                       (else (loop (+ i 1))))))))
          (move!
            (lambda ()
              (vector-map (lambda (row) ((row 'move!))) aliens)))
@@ -123,6 +177,9 @@
          (dispatch
            (lambda (msg)
              (case msg
+               ((x-bounds) (cons 0 1));(x-bounds))
+               ((y-bounds) (cons 1 0));(y-bounds))
+               ((shot!) shot!)
                ((move!) move!)
                ((draw!) draw!)))))
     dispatch))
@@ -189,9 +246,10 @@
            (lambda (msg)
              (case msg
                ((id) id)
-               ((pos-x) x)
-               ((pos-y) y)
+               ((x) x)
+               ((y) y)
                ((reset!) reset!)
+               ((exploded?) exploded?)
                ((explode!) explode!)
                ((move!) move!)
                ((draw!) draw!)))))
@@ -199,6 +257,9 @@
 
 (define (bullets-adt make-id)
   (let* ((bullets (build-ring bullet-limit (lambda (_) (bullet-adt make-id))))
+         (bullet-for-each
+           (lambda (proc)
+             (ring-for-each (lambda (b) (unless (b 'exploded?) (proc b))) bullets)))
          (shoot!
            (lambda (x y)
              (ring-next! bullets)
@@ -213,13 +274,15 @@
          (dispatch
            (lambda (msg)
              (case msg
+               ((for-each) bullet-for-each)
                ((shoot!) shoot!)
                ((move!) move!)
                ((draw!) draw!)))))
     dispatch))
 
-(define (game-init)
-  (let* ((render (render-init "main" window-width window-height))
+(define score 0)
+(define (game-init name)
+  (let* ((render (render-init name window-width window-height))
          (rocket (rocket-adt (render 'rocket-id)))
          (bullets (bullets-adt (render 'bullet-id)))
          (aliens (swarm-adt (render 'alien-id)))
@@ -254,6 +317,25 @@
                         (set! bullet-time (+ bullet-time delta-t))
                         (when (> bullet-time bullet-speed)
                           ((bullets 'move!))
+                          (let* ((t-b (aliens 'y-bounds))
+                                 (l-r (aliens 'x-bounds))
+                                 (top (car t-b))
+                                 (bottom (cdr t-b))
+                                 (left (car l-r))
+                                 (right (cdr l-r)))
+                            ((bullets 'for-each)
+                             (lambda (b)
+                               (let ((x (b 'x))
+                                     (y (b 'y)))
+                                 (when (and (>= y bottom)
+                                            (<= y top)
+                                            (>= x left)
+                                            (<= x right))
+                                   (let ((shot ((aliens 'shot!) x y)))
+                                     (when shot
+                                       (set! score (+ score shot))
+                                       (displayln score)
+                                       ((b 'explode!)))))))))
                           (set! bullet-time 0))
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time alien-speed)
@@ -284,5 +366,5 @@
                ((start) (start))))))
     dispatch))
 
-(define game (game-init))
+(define game (game-init "main"))
 (game 'start)
