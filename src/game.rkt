@@ -40,7 +40,8 @@
                ((down)  (set! y (+ y alien-height)))))))
          (draw!
            (lambda (render)
-             ((render 'draw!) id x y)))
+             ((render 'draw!) id x y)
+             ((render 'animate!) id)))
          (dispatch-alien
            (lambda (msg . opt)
              (case msg

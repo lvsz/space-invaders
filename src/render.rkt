@@ -23,14 +23,29 @@
          (alien-tile
            (lambda (type)
              (let ((bmp (case type
-                          ((1) (make-bitmap-tile "../gfx/alien1-1.png"
-                                                 "../gfx/alien1-1-mask.png"))
-                          ((2) (make-bitmap-tile "../gfx/alien2-1.png"
-                                                 "../gfx/alien2-1-mask.png"))
-                          ((3) (make-bitmap-tile "../gfx/alien3-1.png"
-                                                 "../gfx/alien3-1-mask.png")))))
+                          ((1) (make-tile-sequence
+                                 (list
+                                   (make-bitmap-tile "../gfx/alien1-1.png"
+                                                     "../gfx/alien1-1-mask.png")
+                                   (make-bitmap-tile "../gfx/alien1-2.png"
+                                                     "../gfx/alien1-2-mask.png"))))
+                          ((2) (make-tile-sequence
+                                 (list
+                                   (make-bitmap-tile "../gfx/alien2-1.png"
+                                                     "../gfx/alien2-1-mask.png")
+                                   (make-bitmap-tile "../gfx/alien2-2.png"
+                                                     "../gfx/alien2-2-mask.png"))))
+                          ((3) (make-tile-sequence
+                                 (list
+                                   (make-bitmap-tile "../gfx/alien3-1.png"
+                                                     "../gfx/alien3-1-mask.png")
+                                   (make-bitmap-tile "../gfx/alien3-2.png"
+                                                     "../gfx/alien3-2-mask.png")))))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
+         (animate!
+           (lambda (alien-id)
+             (alien-id 'set-next!)))
          (draw!
            (lambda (id x y)
              (let ((pos-x (* width  x))
@@ -55,6 +70,7 @@
                ((rocket-id) rocket-tile)
                ((bullet-id) bullet-tile)
                ((alien-id)  alien-tile)
+               ((animate!) animate!)
                ((draw!) draw!)
                (else (error "unkown-render-argument:" msg))))))
     ((window 'set-background!) "black")
