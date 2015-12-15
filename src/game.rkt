@@ -27,6 +27,12 @@
 (define alien-width (* 12 unit-width))
 (define alien-height (* 8 unit-height))
 
+(define (vector-fold proc x vec)
+  (let loop ((i 0) (acc x))
+    (if (= i (vector-length vec))
+      acc
+      (loop (+ i 1) (proc acc (vector-ref vec i))))))
+
 (define (alien-adt x y id)
   (let* ((alive? #t)
          (kill!
@@ -36,15 +42,15 @@
          (move!
            (let ((x-diff (* 2 unit-width)))
              (lambda (direction)
-               (when alive?
-                 (case direction
-                   ((left)  (set! x (- x x-diff)))
-                   ((right) (set! x (+ x x-diff)))
-                   ((down)  (set! y (+ y alien-height))))))))
+               (case direction
+                 ((left)  (set! x (- x x-diff)))
+                 ((right) (set! x (+ x x-diff)))
+                 ((down)  (set! y (+ y alien-height)))))))
          (draw!
            (lambda (window)
+             (when alive?
              ((window 'draw!) id x y)
-             ((window 'animate!) id)))
+             ((window 'animate!) id))))
          (dispatch
            (lambda (msg)
              (case msg
@@ -55,9 +61,10 @@
                ((move!)  move!)
                ((draw!)  draw!)
                (else
-                 (raise-arguments-error 'alien-adt
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'alien-adt
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define (alien-row type x y make-id)
@@ -67,40 +74,34 @@
              aliens/row
              (lambda (i)
                (alien-adt (+ x (* 4/3 i alien-width)) y (make-id type)))))
-         (alien
+         (alien-ref
            (lambda (idx)
              (vector-ref aliens idx)))
-         (first-alien
-           (let ((idx 0))
-             (lambda ()
-               (unless ((alien idx) 'alive?)
-                 (let loop ((i (+ idx 1)))
-                   (cond (((alien i) 'alive?)
-                          (set! idx i))
-                         ((= i aliens/row)
-                          (set! alive? #f))
-                         (else
-                          (loop (+ i 1))))))
-                 ((alien idx) 'x))))
-         (last-alien
-           (let ((idx (- aliens/row 1)))
-             (lambda ()
-               (unless ((alien idx) 'alive?)
-                 (let loop ((i (- idx 1)))
-                   (cond (((alien i) 'alive?)
-                          (set! idx i))
-                         ((= i 0)
-                          (set! alive? #f))
-                         (else
-                           (loop (- i 1))))))
-               (+ alien-width ((alien idx) 'x)))))
+         (leftmost  0)
+         (rightmost (- aliens/row 1))
+         (set-leftmost!
+           (lambda ()
+             (let loop ((i (+ leftmost 1)))
+               (cond ((> i rightmost)
+                      (set! alive? #f))
+                     (((alien-ref i) 'alive?)
+                      (set! leftmost i))
+                     (else (loop (+ i 1)))))))
+         (set-rightmost!
+           (lambda ()
+             (let loop ((i (- rightmost 1)))
+               (cond (((alien-ref i) 'alive?)
+                      (set! rightmost i))
+                     ((< i leftmost)
+                      (set! alive? #f))
+                     (else (loop (- i 1)))))))
          (shot!
            (lambda (b-x)
-             (let bsearch ((i 0) (j 10))
+             (let bsearch ((i leftmost) (j rightmost))
                (if (> i j)
                  #f
                  (let* ((mid  (quotient (+ i j) 2))
-                        (aln  (alien mid))
+                        (aln  (alien-ref mid))
                         (a-x1 (aln 'x))
                         (a-x2 (+ a-x1 alien-width)))
                    (cond ((< b-x a-x1)
@@ -108,17 +109,19 @@
                          ((> b-x a-x2)
                           (bsearch (+ mid 1) j))
                          ((aln 'alive?)
+                          (cond ((= mid leftmost)  (set-leftmost!))
+                                ((= mid rightmost) (set-rightmost!)))
                           ((aln 'kill!)))
                          (else #f)))))))
          (move!
            (let ((direction 'right))
-             (lambda ()
+             (lambda (min-x max-x)
                (cond
-                 ((and (<= (first-alien) 0)
+                 ((and (<= min-x 0)
                        (eq? direction 'left))
                   (set! direction 'right)
                   (vector-map (lambda (a) ((a 'move!) 'down)) aliens))
-                 ((and (>= (last-alien) 1)
+                 ((and (>= max-x 1)
                        (eq? direction 'right))
                   (set! direction 'left)
                   (vector-map (lambda (a) ((a 'move!) 'down)) aliens))
@@ -131,14 +134,17 @@
            (lambda (msg)
              (case msg
                ((y) y)
+               ((left-bound)  ((alien-ref leftmost) 'x))
+               ((right-bound) (+ ((alien-ref rightmost) 'x) alien-width))
                ((alive?) alive?)
                ((shot!)  shot!)
                ((move!)  move!)
                ((draw!)  draw!)
                (else
-                 (raise-arguments-error 'alien-row
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'alien-row
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define (swarm-adt make-id)
@@ -173,16 +179,20 @@
          (shot!
            (lambda (b-x b-y)
              (let loop ((i bottom))
-               (let* ((a-row (vector-ref aliens i))
-                      (a-y (a-row 'y)))
-                 (cond ((and (>= b-y a-y)
-                             (<= b-y (+ a-y alien-height)))
-                        ((a-row 'shot!) b-x))
-                       ((= i top) #f)
-                       (else (loop (+ i 1))))))))
+               (if (> i top)
+                 #f
+                 (let* ((a-row (vector-ref aliens i))
+                        (a-y (a-row 'y)))
+                   (cond ((not (a-row 'alive?)) #f)
+                         ((and (>= b-y a-y)
+                               (<= b-y (+ a-y alien-height)))
+                          ((a-row 'shot!) b-x))
+                         (else (loop (+ i 1)))))))))
          (move!
            (lambda ()
-             (vector-map (lambda (row) ((row 'move!))) aliens)))
+             (let ((min-x (vector-fold (lambda (acc x) (min acc (x 'left-bound)))  1 aliens))
+                   (max-x (vector-fold (lambda (acc x) (max acc (x 'right-bound))) 0 aliens)))
+               (vector-map (lambda (row) ((row 'move!) min-x max-x)) aliens))))
          (draw!
            (lambda (window)
              (vector-map (lambda (row) ((row 'draw!) window)) aliens)))
@@ -195,9 +205,10 @@
                ((move!) move!)
                ((draw!) draw!)
                (else
-                 (raise-arguments-error 'swarm-adt
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'swarm-adt
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define (player-adt make-id)
@@ -235,9 +246,10 @@
                ((move!)      move!)
                ((draw!)      draw!)
                (else
-                 (raise-arguments-error 'player-adt
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'player-adt
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define (bullet-adt make-id)
@@ -271,9 +283,10 @@
                ((move!)     move!)
                ((draw!)     draw!)
                (else
-                 (raise-arguments-error 'bullet-adt
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'bullet-adt
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define (bullets-adt make-id)
@@ -303,9 +316,10 @@
                ((move!)    move!)
                ((draw!)    draw!)
                (else
-                 (raise-arguments-error 'bullets-adt
-                                        "invalid argument"
-                                        "given" msg))))))
+                 (raise-arguments-error
+                   'bullets-adt
+                   "invalid argument"
+                   "given" msg))))))
     dispatch))
 
 (define score 0)
@@ -342,6 +356,7 @@
                         (when (> player-time player-speed)
                           ((player 'move!))
                           (set! player-time 0))
+                          ((player  'draw!) window)
                         (set! bullet-time (+ bullet-time delta-t))
                         (when (> bullet-time bullet-speed)
                           ((bullets 'move!))
@@ -365,13 +380,12 @@
                                        (displayln score)
                                        ((b 'explode!)))))))))
                           (set! bullet-time 0))
+                          ((bullets 'draw!) window)
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time alien-speed)
                           ((aliens 'move!))
                           (set! alien-time 0)
-                          ((aliens  'draw!) window))
-                        ((player  'draw!) window)
-                        ((bullets 'draw!) window)))
+                          ((aliens  'draw!) window))))
                     (key-fun
                       (lambda (key)
                         (case key

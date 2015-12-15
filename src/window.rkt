@@ -53,26 +53,29 @@
                ((id 'set-x!) pos-x)
                ((id 'set-y!) pos-y))))
          (set-game-loop-fun!
-           (lambda (f)
-             ((window 'set-update-callback!) f)))
+           (lambda (proc)
+             ((window 'set-update-callback!) proc)))
          (set-key-fun!
-           (lambda (f)
-             ((window 'set-key-callback!) f)))
+           (lambda (proc)
+             ((window 'set-key-callback!) proc)))
          (set-key-release-fun!
-           (lambda (f)
-             ((window 'set-key-release-callback!) f)))
+           (lambda (proc)
+             ((window 'set-key-release-callback!) proc)))
          (dispatch
            (lambda (msg)
              (case msg
-               ((set-game-loop-fun!) set-game-loop-fun!)
-               ((set-key-release-fun!) set-key-release-fun!)
-               ((set-key-fun!) set-key-fun!)
+               ((draw!)     draw!)
+               ((animate!)  animate!)
+               ((alien-id)  alien-tile)
                ((player-id) player-tile)
                ((bullet-id) bullet-tile)
-               ((alien-id)  alien-tile)
-               ((animate!) animate!)
-               ((draw!) draw!)
-               (else (error "unkown-render-argument:" msg))))))
+               ((set-key-fun!)         set-key-fun!)
+               ((set-key-release-fun!) set-key-release-fun!)
+               ((set-game-loop-fun!)   set-game-loop-fun!)
+               (else
+                 (raise-arguments-error 'window-adt
+                                        "invalid argument"
+                                        "given" msg))))))
     ((window 'set-background!) "black")
     dispatch))
 
