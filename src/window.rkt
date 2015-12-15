@@ -2,18 +2,18 @@
 
 (require "Graphics.rkt")
 
-(provide render-init)
+(provide window-adt)
 
-(define (render-init name width height)
+(define (window-adt name width height)
   (let* ((window (make-window width height name))
-         (rocket-layer (window 'make-layer))
+         (player-layer (window 'make-layer))
          (bullet-layer (window 'make-layer))
          (alien-layer  (window 'make-layer))
-         (rocket-tile
+         (player-tile
            (lambda ()
-             (let ((bmp (make-bitmap-tile "../gfx/rocket.png"
-                                          "../gfx/rocket-mask.png")))
-               ((rocket-layer 'add-drawable) bmp)
+             (let ((bmp (make-bitmap-tile "../gfx/player.png"
+                                          "../gfx/player-mask.png")))
+               ((player-layer 'add-drawable) bmp)
                bmp)))
          (bullet-tile
            (lambda ()
@@ -67,7 +67,7 @@
                ((set-game-loop-fun!) set-game-loop-fun!)
                ((set-key-release-fun!) set-key-release-fun!)
                ((set-key-fun!) set-key-fun!)
-               ((rocket-id) rocket-tile)
+               ((player-id) player-tile)
                ((bullet-id) bullet-tile)
                ((alien-id)  alien-tile)
                ((animate!) animate!)
