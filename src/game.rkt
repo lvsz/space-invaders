@@ -11,11 +11,10 @@
 (define bullet-width  (*  1 unit-width))
 (define bullet-height (*  7 unit-height))
 
-(define player-speed 15)
+(define player-speed 30)
 (define bullet-speed 15)
 (define bullet-limit 10)
 (define reload-timer 800)
-
 
 (define (player-adt make-id)
   (let* ((id (make-id))
@@ -39,7 +38,7 @@
                                   (if right? 1 0))))))
          (move!
            (lambda ()
-             (set-x! (+ x (* direction unit-width)))))
+             (set-x! (+ x (* 2 direction unit-width)))))
          (draw!
            (lambda (window)
              ((window 'draw!) id x y)))
@@ -128,12 +127,12 @@
                    "given" msg))))))
     dispatch))
 
-(define score 0)
-(define (game-init name)
+(define (game-init name (random? #f))
   (let* ((window  (window-adt name window-width window-height))
          (player  (player-adt  (window 'player-id)))
          (bullets (bullets-adt (window 'bullet-id)))
          (aliens  (swarm-adt   (window 'alien-id)))
+         (score 0)
          (loaded? #t)
          (shooting? #f)
          (shoot!
@@ -152,6 +151,15 @@
                     (alien-time  0)
                     (game-loop-fun
                       (lambda (delta-t)
+                        (when random?
+                          (case (random 10)
+                            ((0 up #\space) (set! shooting? #t))
+                            ((1 left)   ((player 'direction!) 'left #t))
+                            ((2 right)  ((player 'direction!) 'right #t)))
+                          (case (random 10)
+                            ((0 up #\space) (set! shooting? #f))
+                            ((1 left)  ((player 'direction!) 'left #f))
+                            ((2 right) ((player 'direction!) 'right #f))))
                         (when shooting?
                           (shoot!))
                         (set! reload-time (+ reload-time delta-t))
@@ -178,11 +186,10 @@
                                    (let ((shot ((aliens 'shot!) x y)))
                                      (when shot
                                        (set! score (+ score shot))
-                                       (displayln score)
                                        ((b 'explode!)))))))))
-                          (set! bullet-time 0))
+                          (set! bullet-time 0)
                           ((bullets 'move!))
-                          ((bullets 'draw!) window)
+                          ((bullets 'draw!) window))
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time (aliens 'speed))
                           ((aliens 'move!))
@@ -207,8 +214,10 @@
          (dispatch
            (lambda (msg)
              (case msg
-               ((start) (start))))))
+               ((start) (start))
+               ((score) (displayln score))
+               ((exit)  (exit))))))
     dispatch))
 
-(define game (game-init "main"))
-(game 'start)
+(define game (game-init "main" #t))
+(game 'start) 
