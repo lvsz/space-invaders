@@ -2,7 +2,17 @@
 
 (require "Graphics.rkt")
 
-(provide window-adt)
+(provide window-width
+         window-height
+         unit-width
+         unit-height
+         window-adt)
+
+(define window-width 224)
+(define window-height 256)
+
+(define unit-width  1/224)
+(define unit-height 1/256)
 
 (define (window-adt name width height)
   (let* ((window (make-window width height name))
