@@ -1,32 +1,26 @@
 #lang racket
 
 (require "window.rkt"
-         "ring.rkt"
-         "aliens.rkt")
+         "aliens.rkt"
+         "ring.rkt")
 
 (provide (all-defined-out))
 
 (define player-width  (* 13 unit-width))
 (define player-height (*  8 unit-height))
 (define bullet-width  (*  1 unit-width))
-(define bullet-height (*  7 unit-height))
+(define bullet-height (*  3 unit-height))
 
 (define player-speed 30)
 (define bullet-speed 15)
-(define bullet-limit 10)
-(define reload-timer 800)
+(define bullet-limit  7)
+(define reload-timer 300)
 
 (define (player-adt make-id)
   (let* ((id (make-id))
          (x (- 1/2 (/ player-width 2)))
          (y 9/10)
          (direction 0)
-         (set-x!
-           (lambda (new-x)
-             (set! x new-x)))
-         (set-y!
-           (lambda (new-y)
-             (set! y new-y)))
          (direction!
            (let ((left?  #f)
                  (right? #f))
@@ -37,8 +31,14 @@
                (set! direction (+ (if left? -1 0)
                                   (if right? 1 0))))))
          (move!
-           (lambda ()
-             (set-x! (+ x (* 2 direction unit-width)))))
+           (let ((diff (* 2 unit-width))
+                 (l-edge 0)
+                 (r-edge (- 1 player-width)))
+             (lambda ()
+               (cond ((and (< x r-edge) (= direction 1))
+                      (set! x (+ x diff)))
+                     ((and (> x l-edge) (= direction -1))
+                      (set! x (- x diff)))))))
          (draw!
            (lambda (window)
              ((window 'draw!) id x y)))
@@ -69,11 +69,14 @@
              (set! y new-y)))
          (explode!
            (lambda ()
+             (set! x 1)
              (set! exploded? #t)))
          (move!
            (lambda ()
              (unless exploded?
-               (set! y (- y bullet-height)))))
+               (set! y (- y bullet-height))
+               (when (< y 0)
+                 (explode!)))))
          (draw!
            (lambda (window)
              ((window 'draw!) id x y)))
@@ -95,18 +98,24 @@
     dispatch))
 
 (define (bullets-adt make-id)
-  (let* ((bullets (build-ring bullet-limit (lambda (_) (bullet-adt make-id))))
+  (let* ((bullets (build-ring
+                    bullet-limit
+                    (lambda (_)
+                      (bullet-adt make-id))))
          (bullet-for-each
            (lambda (proc)
              (ring-for-each
                (lambda (b)
                  (unless (b 'exploded?) (proc b)))
                bullets)))
+         (ready?
+           (lambda ()
+             ((ring-head bullets) 'exploded?)))
          (shoot!
            (lambda (x y)
-             (ring-next! bullets)
-             (let ((bullet (ring-head bullets)))
-               ((bullet 'reset!) x y))))
+             (when (ready?)
+               (((ring-head bullets) 'reset!) x y)
+               (ring-next! bullets))))
          (move!
            (lambda ()
              (ring-for-each (lambda (b) ((b 'move!))) bullets)))
@@ -127,7 +136,7 @@
                    "given" msg))))))
     dispatch))
 
-(define (game-init name (random? #f))
+(define (game-init (name "main") (random? #f))
   (let* ((window  (window-adt name window-width window-height))
          (player  (player-adt  (window 'player-id)))
          (bullets (bullets-adt (window 'bullet-id)))
@@ -153,13 +162,12 @@
                       (lambda (delta-t)
                         (when random?
                           (case (random 10)
-                            ((0 up #\space) (set! shooting? #t))
-                            ((1 left)   ((player 'direction!) 'left #t))
-                            ((2 right)  ((player 'direction!) 'right #t)))
-                          (case (random 10)
-                            ((0 up #\space) (set! shooting? #f))
-                            ((1 left)  ((player 'direction!) 'left #f))
-                            ((2 right) ((player 'direction!) 'right #f))))
+                            ((0) (set! shooting? #t))
+                            ((1) ((player 'direction!) 'left #t))
+                            ((2) ((player 'direction!) 'right #t))
+                            ((3) (set! shooting? #f))
+                            ((4) ((player 'direction!) 'left #f))
+                            ((5) ((player 'direction!) 'right #f))))
                         (when shooting?
                           (shoot!))
                         (set! reload-time (+ reload-time delta-t))
@@ -169,8 +177,8 @@
                         (set! player-time (+ player-time delta-t))
                         (when (> player-time player-speed)
                           ((player 'move!))
-                          (set! player-time 0))
                           ((player  'draw!) window)
+                          (set! player-time 0))
                         (set! bullet-time (+ bullet-time delta-t))
                         (when (> bullet-time bullet-speed)
                           (let-values (((top bottom) (aliens 'y-bounds))
@@ -219,5 +227,7 @@
                ((exit)  (exit))))))
     dispatch))
 
-(define game (game-init "main" #t))
-(game 'start) 
+(define (game)
+  (let ((g (game-init)))
+    (g 'start)))
+(game)

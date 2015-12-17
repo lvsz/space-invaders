@@ -9,19 +9,23 @@
 (define alien-width (* 12 unit-width))
 (define alien-height (* 8 unit-height))
 
-(define (vector-fold proc x vec)
-  (let loop ((i 0) (acc x))
-    (if (= i (vector-length vec))
-      acc
-      (loop (+ i 1) (proc acc (vector-ref vec i))))))
+(define (vector-fold proc x . vec)
+  (let ((end (apply min (map vector-length vec))))
+    (let loop ((i 0) (acc x))
+      (if (= i end)
+        acc
+        (loop (+ i 1)
+              (apply proc acc (map (lambda (v) (vector-ref v i)) vec)))))))
 
 (define (alien-adt x make-id type)
   (let* ((id (make-id type))
+         (health type)
          (alive? #t)
          (kill!
            (lambda ()
-             (set! alive? #f)
-             (* type 100)))
+             (if (> health 1)
+               (begin (set! health (- health 1)) 0)
+               (begin (set! alive? #f) (* type 100)))))
          (move!
            (let ((x-diff (* 2 unit-width)))
              (lambda (direction)
@@ -30,9 +34,17 @@
                  ((right) (set! x (+ x x-diff)))))))
          (draw!
            (lambda (window y)
-             (when alive?
-             ((window 'draw!) id x y)
-             ((window 'animate!) id))))
+             (cond (alive?
+                    ((window 'draw!) id x y)
+                    ((window 'animate!) id))
+                   ((= health 1)
+                    ((window 'draw!) id 1 y)
+                    (set! id (make-id 0))
+                    ((window 'draw!) id x y)
+                    (set! health 0))
+                   ((= health 0)
+                    ((window 'draw!) id 1 y)
+                    (set! health -1)))))
          (dispatch
            (lambda (msg)
              (case msg
@@ -87,7 +99,8 @@
                           (bsearch (+ idx 1) j))
                          ((aln 'alive?)
                           (let ((score ((aln 'kill!))))
-                            (cond ((= leftmost rightmost) (set! alive? #f))
+                            (cond ((zero? score) (void))
+                                  ((= leftmost rightmost) (set! alive? #f))
                                   ((= idx leftmost)  (set-leftmost!))
                                   ((= idx rightmost) (set-rightmost!)))
                             score))

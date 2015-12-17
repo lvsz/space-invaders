@@ -33,24 +33,30 @@
          (alien-tile
            (lambda (type)
              (let ((bmp (case type
+                          ((0) (make-bitmap-tile
+                                 "../gfx/alien-death.png"
+                                 "../gfx/alien-death-mask.png"))
                           ((1) (make-tile-sequence
-                                 (list
-                                   (make-bitmap-tile "../gfx/alien1-1.png"
-                                                     "../gfx/alien1-1-mask.png")
-                                   (make-bitmap-tile "../gfx/alien1-2.png"
-                                                     "../gfx/alien1-2-mask.png"))))
+                                 (list (make-bitmap-tile
+                                         "../gfx/alien1-1.png"
+                                         "../gfx/alien1-1-mask.png")
+                                       (make-bitmap-tile
+                                         "../gfx/alien1-2.png"
+                                         "../gfx/alien1-2-mask.png"))))
                           ((2) (make-tile-sequence
-                                 (list
-                                   (make-bitmap-tile "../gfx/alien2-1.png"
-                                                     "../gfx/alien2-1-mask.png")
-                                   (make-bitmap-tile "../gfx/alien2-2.png"
-                                                     "../gfx/alien2-2-mask.png"))))
+                                 (list (make-bitmap-tile
+                                         "../gfx/alien2-1.png"
+                                         "../gfx/alien2-1-mask.png")
+                                       (make-bitmap-tile
+                                         "../gfx/alien2-2.png"
+                                         "../gfx/alien2-2-mask.png"))))
                           ((3) (make-tile-sequence
-                                 (list
-                                   (make-bitmap-tile "../gfx/alien3-1.png"
-                                                     "../gfx/alien3-1-mask.png")
-                                   (make-bitmap-tile "../gfx/alien3-2.png"
-                                                     "../gfx/alien3-2-mask.png")))))))
+                                 (list (make-bitmap-tile
+                                         "../gfx/alien3-1.png"
+                                         "../gfx/alien3-1-mask.png")
+                                       (make-bitmap-tile
+                                         "../gfx/alien3-2.png"
+                                         "../gfx/alien3-2-mask.png")))))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
          (animate!
