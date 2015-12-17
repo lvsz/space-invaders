@@ -136,7 +136,7 @@
                    "given" msg))))))
     dispatch))
 
-(define (game-init (name "main") (random? #f))
+(define (game-init (name "Main") (random? #f))
   (let* ((window  (window-adt name window-width window-height))
          (player  (player-adt  (window 'player-id)))
          (bullets (bullets-adt (window 'bullet-id)))

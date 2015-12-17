@@ -81,11 +81,12 @@
     
     ;; Construct FPS string
     (define (construct-fps-string title fps)
-      (define fps-string (number->string (exact->inexact fps)))
-      (set! fps-string (string-append title fps-string))
-      (set! fps-string (list-ref (string-split fps-string ".") 0))
-      (set! fps-string (string-append "  FPS: " fps-string))
-      fps-string)
+      (format "~a — FPS: ~a" title fps))
+    ; (define fps-string (number->string (exact->inexact fps)))
+    ; (set! fps-string (string-append title fps-string))
+    ; (set! fps-string (list-ref (string-split fps-string ".") 0))
+    ; (set! fps-string (string-append "  FPS: " fps-string))
+    ; fps-string)
     
     ;; Make a canvas class that uses our own keyboard callback.
     (define my-canvas%
