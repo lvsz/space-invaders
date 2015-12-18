@@ -195,9 +195,9 @@
                                      (when shot
                                        (set! score (+ score shot))
                                        ((b 'explode!)))))))))
-                          (set! bullet-time 0)
                           ((bullets 'move!))
-                          ((bullets 'draw!) window))
+                          ((bullets 'draw!) window)
+                          (set! bullet-time 0))
                         (set! alien-time (+ alien-time delta-t))
                         (when (> alien-time (aliens 'speed))
                           ((aliens 'move!))
@@ -230,4 +230,6 @@
 (define (game)
   (let ((g (game-init)))
     (g 'start)))
+
 (game)
+

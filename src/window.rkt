@@ -1,6 +1,7 @@
 #lang racket
 
-(require "Graphics.rkt")
+(require "Graphics.rkt"
+         "sprites.rkt")
 
 (provide window-width
          window-height
@@ -33,30 +34,12 @@
          (alien-tile
            (lambda (type)
              (let ((bmp (case type
-                          ((0) (make-bitmap-tile
-                                 "../gfx/alien-death.png"
-                                 "../gfx/alien-death-mask.png"))
-                          ((1) (make-tile-sequence
-                                 (list (make-bitmap-tile
-                                         "../gfx/alien1-1.png"
-                                         "../gfx/alien1-1-mask.png")
-                                       (make-bitmap-tile
-                                         "../gfx/alien1-2.png"
-                                         "../gfx/alien1-2-mask.png"))))
-                          ((2) (make-tile-sequence
-                                 (list (make-bitmap-tile
-                                         "../gfx/alien2-1.png"
-                                         "../gfx/alien2-1-mask.png")
-                                       (make-bitmap-tile
-                                         "../gfx/alien2-2.png"
-                                         "../gfx/alien2-2-mask.png"))))
-                          ((3) (make-tile-sequence
-                                 (list (make-bitmap-tile
-                                         "../gfx/alien3-1.png"
-                                         "../gfx/alien3-1-mask.png")
-                                       (make-bitmap-tile
-                                         "../gfx/alien3-2.png"
-                                         "../gfx/alien3-2-mask.png")))))))
+                          ((0) (invader-death))
+                          ((1) (invader-R1))
+                          ((2) (invader-B1))
+                          ((3) (invader-B2))
+                          ((4) (invader-G2))
+                          ((5) (invader-G3)))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
          (animate!
