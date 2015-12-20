@@ -20,6 +20,7 @@
 (define (alien-adt x make-id type)
   (let* ((id (make-id type))
          (health (quotient (+ type 1) 2))
+         (points (* 100 health))
          (alive? #t)
          (kill!
            (lambda ()
@@ -27,7 +28,7 @@
                (begin (set! health (- health 1))
                       0)
                (begin (set! alive? #f)
-                      (* type 100)))))
+                      points))))
          (move!
            (let ((x-diff (* 2 unit-width)))
              (lambda (direction)
@@ -42,7 +43,6 @@
                    ((= health 1)
                     ((window 'draw!) id 1 y)
                     (set! id (make-id 0))
-                    ((window 'draw!) id x y)
                     ((window 'draw!) id x y)
                     (set! health 0))
                    ((= health 0)

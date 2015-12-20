@@ -227,9 +227,7 @@
                ((exit)  (exit))))))
     dispatch))
 
-(define (game)
-  (let ((g (game-init)))
-    (g 'start)))
+(define game (game-init))
 
-(game)
+(game 'start)
 
