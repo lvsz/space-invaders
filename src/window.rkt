@@ -9,6 +9,7 @@
          unit-height
          window-adt)
 
+;; based on resolution of the original game
 (define window-width 224)
 (define window-height 256)
 
@@ -20,17 +21,20 @@
          (player-layer (window 'make-layer))
          (bullet-layer (window 'make-layer))
          (alien-layer  (window 'make-layer))
+
          (player-tile
            (lambda ()
              (let ((bmp (make-bitmap-tile "../gfx/player.png"
                                           "../gfx/player-mask.png")))
                ((player-layer 'add-drawable) bmp)
                bmp)))
+
          (bullet-tile
            (lambda ()
              (let ((bmp (make-bitmap-tile "../gfx/bullet.png")))
                ((bullet-layer 'add-drawable) bmp)
                bmp)))
+
          (alien-tile
            (lambda (type)
              (let ((bmp (case type
@@ -42,24 +46,30 @@
                           ((5) (invader-G3)))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
+
          (animate!
            (lambda (alien-id)
              (alien-id 'set-next!)))
+
          (draw!
            (lambda (id x y)
              (let ((pos-x (* width  x))
                    (pos-y (* height y)))
                ((id 'set-x!) pos-x)
                ((id 'set-y!) pos-y))))
+
          (set-game-loop-fun!
            (lambda (proc)
              ((window 'set-update-callback!) proc)))
+
          (set-key-fun!
            (lambda (proc)
              ((window 'set-key-callback!) proc)))
+
          (set-key-release-fun!
            (lambda (proc)
              ((window 'set-key-release-callback!) proc)))
+
          (dispatch
            (lambda (msg)
              (case msg

@@ -4,6 +4,8 @@
 
 (provide (all-defined-out))
 
+;;; seperate file remove filepath clutter in the other files
+
 (define (invader-death)
   (make-bitmap-tile
     "../gfx/invaders/death.png"
