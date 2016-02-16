@@ -29,7 +29,7 @@
 
      ;; "health bar"
      ;; varies according to alien type
-     (health (quotient (+ type 1) 2))
+     (health (+ (quotient type 2) 1))
 
      ;; points upon killing are based on initial health
      (points (* 100 health))
@@ -73,7 +73,7 @@
            ;; draws the explosion and sets health to 0
            ((= health 1)
              ((window 'draw!) id 1 y)
-             (set! id (make-id 0))
+             (set! id (make-id -1))
              ((window 'draw!) id x y)
              (set! health 0))
            ;; when health is 0, draw explosion outside of window
@@ -234,7 +234,7 @@
                      ;; calculates spacing between rows
                      ;; and the type of alien they'll carry
                      (alien-row x (+ (* -2 alien-height i)
-                                     (* 10 alien-height)) make-id (+ i 1)))))
+                                     (* 10 alien-height)) make-id i))))
 
          ;; topmost row
          (top (- aliens/column 1))

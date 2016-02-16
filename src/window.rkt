@@ -37,13 +37,15 @@
 
          (alien-tile
            (lambda (type)
-             (let ((bmp (case type
-                          ((0) (invader-death))
-                          ((1) (invader-R1))
-                          ((2) (invader-B1))
-                          ((3) (invader-B2))
-                          ((4) (invader-G2))
-                          ((5) (invader-G3)))))
+             (let ((bmp (if (negative? type)
+                          (invader-death)
+                          (case (modulo type 5)
+                            ;((0) (invader-death))
+                            ((0) (invader-R1))
+                            ((1) (invader-B1))
+                            ((2) (invader-B2))
+                            ((3) (invader-G2))
+                            ((4) (invader-G3))))))
                ((alien-layer 'add-drawable) bmp)
                bmp)))
 
