@@ -76,17 +76,18 @@
     ;; Calculate FPS from the time (ms) since last frame
     (define (calculate-fps delta-time)
       (if (not (= delta-time 0))
-          (quotient 1000 delta-time) 
-          fps))
-    
+        (quotient 1000 delta-time) 
+        fps))
+
     ;; Construct FPS string
     (define (construct-fps-string title fps)
       (format "~a — FPS: ~a" title fps))
-    ; (define fps-string (number->string (exact->inexact fps)))
-    ; (set! fps-string (string-append title fps-string))
-    ; (set! fps-string (list-ref (string-split fps-string ".") 0))
-    ; (set! fps-string (string-append "  FPS: " fps-string))
-    ; fps-string)
+     ; (define (construct-fps-string title fps)
+     ; (define fps-string (number->string (exact->inexact fps)))
+     ; (set! fps-string (string-append title fps-string))
+     ; (set! fps-string (list-ref (string-split fps-string ".") 0))
+     ; (set! fps-string (string-append "  FPS: " fps-string))
+     ; fps-string)
     
     ;; Make a canvas class that uses our own keyboard callback.
     (define my-canvas%
@@ -177,8 +178,8 @@
       (cond ((eq? msg 'make-layer) (add-layer))
             ((eq? msg 'set-background!) set-background!)
             ((eq? msg 'set-key-callback!) (lambda (eh) (set! keyboard-callback eh)))
-            ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
             ((eq? msg 'set-update-callback!) (lambda (gl) (set! update-callback gl)))
+            ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
             (else (raise-arguments-error 'window
                                          "wrong message sent"
                                          "message"
@@ -192,6 +193,9 @@
     (send buffer-bitmap-dc set-text-foreground (make-object color% "white"))
     ;; and finally launch the self-sustaining game-loop.
     (launch-game-loop)
+    
+    (send canvas focus)
+    
     dispatch))
 
 ;;;;################################ BITMAP WITH ROTATED DC MATRIX #######################################
