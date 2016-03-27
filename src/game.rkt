@@ -84,6 +84,7 @@
     dispatch))
 
 
+#|
 ;;; abstract data type for single bullets, used by the player
 ;;; designed for every bullet to be created before the game begins
 ;;; this saves resources because it doesn't have to create
@@ -148,8 +149,96 @@
                "invalid argument"
                "given" msg))))))
     dispatch))
+|#
 
 
+(define (bullet-adt x y make-id window)
+  (let*
+    ((id (make-id))
+     (active? #t)
+     (explode!
+       (lambda ()
+         (set! active? #f)))
+     (move!
+       (lambda ()
+         (when active?
+           (set! y (- y bullet-height))
+           ;; inactivates the bullet upon hitting the top border
+           (when (< y 0)
+             (explode!)))))
+
+     ;; sends draw message with id and coordinates to window adt
+     (draw!
+       (lambda ()
+         ((window 'draw!) id x y)))
+
+     (dispatch
+       (lambda (msg)
+         (case msg
+           ((x) x)
+           ((y) y)
+           ((active?) active?)
+           ((explode!)  explode!)
+           ((move!)     move!)
+           ((draw!)     draw!)
+           (else
+             (raise-arguments-error
+               'bullet-adt
+               "invalid argument"
+               "given" msg))))))
+    dispatch))
+
+(define (mfor-each proc mlist)
+  (unless (null? mlist)
+    (proc (mcar mlist))
+    (mfor-each proc (mcdr mlist))))
+
+(define (bullets-adt make-id window)
+  (let*
+    ((bullets '())
+     (bullet-for-each
+       (lambda (proc)
+         (mfor-each proc bullets)))
+     (ready? #t)
+     (shoot!
+       (lambda (x y)
+         (set! bullets (mcons (bullet-adt x y make-id window) bullets))))
+      ;;   (let ((new-bullet (mcons (bullet-adt x y make-id) '())))
+      ;;     (set-mcdr! last-bullet new-bullet)
+      ;;     (displayln bullets)
+      ;;     (set! last-bullet (mcdr last-bullet)))))
+     (move!
+       (lambda ()
+         (mfor-each (lambda (b) ((b 'move!))) bullets)))
+      ;;   (let loop ((current bullets))
+      ;;     (cond
+      ;;       ((null? current) (void))
+      ;;       (((mcar current) 'active?)
+      ;;        (set! bullets current)
+      ;;        (mfor-each (lambda (b) (b 'move!)) bullets))
+      ;;       (loop (mcdr current))))))
+     (draw!
+       (lambda ()
+         (mfor-each (lambda (b) ((b 'draw!))) bullets)))
+     (dispatch
+       (lambda (msg)
+         (case msg
+           ((for-each) bullet-for-each)
+           ((shoot!)   shoot!)
+           ((move!)    move!)
+           ((draw!)    draw!)
+           (else
+             (raise-arguments-error
+               'bullets-adt
+               "invalid argument"
+               "given" msg))))))
+    dispatch))
+
+
+
+
+
+#|
 ;;; object that stores the individual bullets created at the start of the game
 ;;; functions like an object pool, by using a circular data structure
 (define (bullets-adt make-id)
@@ -208,6 +297,7 @@
                "invalid argument"
                "given" msg))))))
     dispatch))
+|#
 
 
 ;;; initialises the game
@@ -215,7 +305,7 @@
 (define (game-init (name "Main") (random? #f))
   (let* ((window  (window-adt name window-width window-height))
          (player  (player-adt  (window 'player-id)))
-         (bullets (bullets-adt (window 'bullet-id)))
+         (bullets (bullets-adt (window 'bullet-id) window))
          (aliens  (swarm-adt   (window 'alien-id)))
          (score 0)
 
@@ -299,7 +389,7 @@
                                        (set! score (+ score shot))
                                        ((b 'explode!)))))))))
                           ((bullets 'move!))
-                          ((bullets 'draw!) window)
+                          ((bullets 'draw!))
                           (set! bullet-time 0))
 
                         ;; moves the aliens
