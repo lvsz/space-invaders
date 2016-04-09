@@ -10,7 +10,6 @@
 (define alien-height (* 8 unit-height))
 
 ;; generic fold function for vectors
-;; for some reason not part of standard Racket
 ;; ought to work exactly like fold-left in R6RS
 (define (vector-fold proc x . vec)
   (let ((end (apply min (map vector-length vec))))
@@ -68,18 +67,18 @@
            (alive?
              ((window 'draw!) id x y)
              ((window 'animate!) id))
-           ;; if health is 1, it gets drawn outside of the window
-           ;; then a new id for the explosion animation
+           ;; if health is 1, remove alien graphic
+           ;; then create a new id for the explosion animation
            ;; draws the explosion and sets health to 0
            ((= health 1)
-             ((window 'draw!) id 1 y)
+             ((window 'remove!) id)
              (set! id (make-id -1))
              ((window 'draw!) id x y)
              (set! health 0))
-           ;; when health is 0, draw explosion outside of window
+           ;; when health is 0, remove explosion graphic
            ;; then change health to -1, for which this conditional returns null
            ((= health 0)
-             ((window 'draw!) id 1 y)
+             ((window 'remove!) id)
              (set! health -1)))))
 
      (dispatch
