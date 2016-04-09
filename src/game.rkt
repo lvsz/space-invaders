@@ -158,7 +158,8 @@
      (active? #t)
      (explode!
        (lambda ()
-         (set! active? #f)))
+         (set! active? #f)
+         ((window 'remove!) id)))
      (move!
        (lambda ()
          (when active?
@@ -188,38 +189,49 @@
                "given" msg))))))
     dispatch))
 
-(define (mfor-each proc mlist)
-  (unless (null? mlist)
-    (proc (mcar mlist))
-    (mfor-each proc (mcdr mlist))))
+;; for-each function for mutable lists
+(define (mfor-each proc . mlists)
+  (when (and (pair? mlists) (andmap mpair? mlists))
+    (apply proc (map mcar mlists))
+    (apply mfor-each proc (map mcdr mlists))))
+
+;; destructive append for mutable lists
+(define (mappend! mlist element)
+  (if (null? (mcdr mlist))
+    (set-mcdr! mlist (mcons element '()))
+    (mappend! (mcdr mlist) element)))
+
 
 (define (bullets-adt make-id window)
   (let*
-    ((bullets '())
+    ((bullets (mcons 'bullets '()))
      (bullet-for-each
        (lambda (proc)
-         (mfor-each proc bullets)))
+         (mfor-each proc (mcdr bullets))))
      (ready? #t)
      (shoot!
        (lambda (x y)
-         (set! bullets (mcons (bullet-adt x y make-id window) bullets))))
+         (mappend! bullets (bullet-adt x y make-id window))))
+      ;;   (set-mcdr! bullets (mcons (bullet-adt x y make-id window) (mcdr bullets)))))
       ;;   (let ((new-bullet (mcons (bullet-adt x y make-id) '())))
       ;;     (set-mcdr! last-bullet new-bullet)
       ;;     (displayln bullets)
       ;;     (set! last-bullet (mcdr last-bullet)))))
      (move!
        (lambda ()
-         (mfor-each (lambda (b) ((b 'move!))) bullets)))
-      ;;   (let loop ((current bullets))
-      ;;     (cond
-      ;;       ((null? current) (void))
-      ;;       (((mcar current) 'active?)
-      ;;        (set! bullets current)
-      ;;        (mfor-each (lambda (b) (b 'move!)) bullets))
-      ;;       (loop (mcdr current))))))
+         (when (mpair? (mcdr bullets))
+           (let loop ((active-bullets (mcdr bullets)))
+             (cond
+               ((null? active-bullets)
+                (set-mcdr! bullets '()))
+               (((mcar active-bullets) 'active?)
+                (set-mcdr! bullets active-bullets)
+                (bullet-for-each (lambda (b) ((b 'move!)))))
+               (else
+                (loop (mcdr active-bullets))))))))
      (draw!
        (lambda ()
-         (mfor-each (lambda (b) ((b 'draw!))) bullets)))
+         (bullet-for-each (lambda (b) ((b 'draw!))))))
      (dispatch
        (lambda (msg)
          (case msg
