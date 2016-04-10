@@ -16,7 +16,8 @@
 (define bullet-speed 15)
 (define bullet-limit  7)
 (define reload-timer 300)
-
+(define alien-shoot-coefficient 15/100)
+(define alien-shoot-chance (floor (* 100 (/ alien-shoot-coefficient))))
 
 ;;; abstract data type for the player's ship
 ;;; id and make-id are objects provided by window.rkt
@@ -25,10 +26,27 @@
 (define (player-adt make-id)
   (let*
     ((id (make-id))
+     (lives 3)
 
      ;; default X and Y positions
      (x (- 1/2 (/ player-width 2)))
      (y 9/10)
+     (x-bounds
+       (lambda ()
+         (values x (+ x player-width))))
+     (y-bounds
+       (lambda ()
+         (values (+ y player-height) y)))
+
+     (shot!
+       (lambda (x y)
+         (displayln lives)
+         (if (zero? lives)
+           (values #t #t)
+           (begin
+             (set! lives (- lives 1))
+             (values #t #f)))))
+
 
      ;; zero for no direction, -1 for left, 1 for right
      (direction 0)
@@ -73,6 +91,9 @@
          (case msg
            ((x) x)
            ((y) y)
+           ((x-bounds) (x-bounds))
+           ((y-bounds) (y-bounds))
+           ((shot!)      shot!)
            ((direction!) direction!)
            ((move!)      move!)
            ((draw!)      draw!)
@@ -152,7 +173,7 @@
 |#
 
 
-(define (bullet-adt x y make-id window)
+(define (bullet-adt type x y make-id window)
   (let*
     ((id (make-id))
      (active? #t)
@@ -160,12 +181,14 @@
        (lambda ()
          (set! active? #f)
          ((window 'remove!) id)))
+
+     (+/- (if (eq? type 'player) - +))
      (move!
        (lambda ()
          (when active?
-           (set! y (- y bullet-height))
+           (set! y (+/- y bullet-height))
            ;; inactivates the bullet upon hitting the top border
-           (when (< y 0)
+           (unless (< 0 y 1)
              (explode!)))))
 
      ;; sends draw message with id and coordinates to window adt
@@ -178,7 +201,8 @@
          (case msg
            ((x) x)
            ((y) y)
-           ((active?) active?)
+           ((type)      type)
+           ((active?)   active?)
            ((explode!)  explode!)
            ((move!)     move!)
            ((draw!)     draw!)
@@ -210,8 +234,8 @@
          (mfor-each proc (mcdr bullets))))
      (ready? #t)
      (shoot!
-       (lambda (x y)
-         (mappend! bullets (bullet-adt x y make-id window))))
+       (lambda (type x y)
+         (mappend! bullets (bullet-adt type x y make-id window))))
       ;;   (set-mcdr! bullets (mcons (bullet-adt x y make-id window) (mcdr bullets)))))
       ;;   (let ((new-bullet (mcons (bullet-adt x y make-id) '())))
       ;;     (set-mcdr! last-bullet new-bullet)
@@ -339,7 +363,7 @@
                             (/ player-width 2)
                             (- bullet-width)))
                       (y (player 'y)))
-                 ((bullets 'shoot!) x y)))))
+                 ((bullets 'shoot!) 'player x y)))))
 
          ;; starts the game
          (start
@@ -375,46 +399,58 @@
                         (set! player-time (+ player-time delta-t))
                         (when (> player-time player-speed)
                           ((player 'move!))
-                          ((player  'draw!) window)
+                          ((player 'draw!) window)
                           (set! player-time 0))
+
+                        ;; moves the aliens and controls their bullets
+                        (set! alien-time (+ alien-time delta-t))
+                        (when (> alien-time (aliens 'speed))
+                          ((aliens 'move!))
+                          (when (<= 100 (random alien-shoot-chance))
+                            (let-values (((x y) (aliens 'shoot)))
+                              ((bullets 'shoot!) 'alien x y)))
+                          (set! alien-time 0)
+                          ((aliens 'draw!) window))
 
                         ;; moves the bullets, and checks for collisions
                         (set! bullet-time (+ bullet-time delta-t))
                         (when (> bullet-time bullet-speed)
                           ;; gets the bounds of the alien swarm
                           ;; so it doesn't check for collisons when not near it
-                          (let-values (((top bottom) (aliens 'y-bounds))
-                                       ((left right) (aliens 'x-bounds)))
-                            ((bullets 'for-each)
-                             (lambda (b)
-                               (let ((x (b 'x))
-                                     (y (b 'y)))
+                          ((bullets 'for-each)
+                           (lambda (b)
+                             (let* ((x (b 'x))
+                                    (y (b 'y))
+                                    (type (b 'type))
+                                    (target (if (eq? type 'player)
+                                              aliens
+                                              player)))
+                               (let-values (((top bottom) (target 'y-bounds))
+                                            ((left right) (target 'x-bounds)))
                                  (when (and (>= y bottom)
                                             (<= y top)
                                             (>= x left)
                                             (<= x right))
-                                   (let-values (((shot victory) ((aliens 'shot!) x y)))
+                                   (let-values (((shot game-over) ((target 'shot!) x y)))
                                      ;; shot returns #f when no hits
                                      ;; 0 for hitting but not killing an alien
                                      ;; score to be added for killing an alien
                                      (when shot
-                                       (set! score (+ score shot))
                                        ((b 'explode!))
-                                       (when victory
-                                         (displayln "YOU WIN")
+                                       (when (not (eq? shot 0))
+                                         ((target 'draw!) window)
+                                         (when (eq? type 'player)
+                                           (set! score (+ score shot))))
+                                       (when game-over
+                                         (displayln (if (eq? type 'player)
+                                                      "YOU WIN"
+                                                      "YOU LOSE"))
                                          (exit)))))))))
                           ((bullets 'move!))
                           ((bullets 'draw!))
-                          (set! bullet-time 0))
+                          (set! bullet-time 0))))
 
-                        ;; moves the aliens
-                        (set! alien-time (+ alien-time delta-t))
-                        (when (> alien-time (aliens 'speed))
-                          ((aliens 'move!))
-                          (set! alien-time 0)
-                          ((aliens 'draw!) window))))
-
-                    ;; function the processes key press events
+                    ;; function that processes key press events
                     (key-fun
                       (lambda (key)
                         (case key

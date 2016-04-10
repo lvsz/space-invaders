@@ -163,7 +163,7 @@
                     ;; positive integer if it's also a kill
                     ;; #f if it's already dead
                     (let ((result ((alien 'hit!))))
-                      (when (and (integer? result) (positive? result))
+                      (when (kill? result)
                         (set! alive (- alive 1))
                         (cond
                           ((and (= i bottom-most) (alive?))
@@ -189,8 +189,8 @@
        (lambda (msg)
          (case msg
            ((x) x)
-           ((top-bound)  ((alien-ref top-most) 'x))
-           ((bottom-bound) (+ ((alien-ref bottom-most) 'x) alien-width))
+           ((top-bound)  ((alien-ref top-most) 'y))
+           ((bottom-bound) (+ ((alien-ref bottom-most) 'y) alien-height))
            ((alive?) (alive?))
            ((shot!)  shot!)
            ((move!)  move!)
@@ -234,6 +234,15 @@
                (if ((vector-ref aliens i) 'alive?)
                  (set! right i)
                  (loop (- i 1))))))
+
+         (shoot
+           (lambda ()
+             (let loop ((i (- (random (+ left 1) (+ right 2)) 1)))
+               (if ((vector-ref aliens i) 'alive?)
+                 (values (+ ((vector-ref aliens i) 'x) (/ alien-width 2))
+                         ((vector-ref aliens i) 'bottom-bound))
+                 (loop (- (random (+ left 1) (+ right 2)) 1))))))
+
 
          ;; intitial speed depends on amount of aliens
          (speed (* aliens/column aliens/row 16))
@@ -310,6 +319,7 @@
              (case msg
                ((x-bounds) (values 0 1))
                ((y-bounds) (values 1 0))
+               ((shoot) (shoot))
                ((speed) speed)
                ((shot!) shot!)
                ((move!) move!)
