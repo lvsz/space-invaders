@@ -393,13 +393,16 @@
                                             (<= y top)
                                             (>= x left)
                                             (<= x right))
-                                   (let ((shot ((aliens 'shot!) x y)))
+                                   (let-values (((shot victory) ((aliens 'shot!) x y)))
                                      ;; shot returns #f when no hits
                                      ;; 0 for hitting but not killing an alien
                                      ;; score to be added for killing an alien
                                      (when shot
                                        (set! score (+ score shot))
-                                       ((b 'explode!)))))))))
+                                       ((b 'explode!))
+                                       (when victory
+                                         (displayln "YOU WIN")
+                                         (exit)))))))))
                           ((bullets 'move!))
                           ((bullets 'draw!))
                           (set! bullet-time 0))

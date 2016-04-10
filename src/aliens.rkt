@@ -8,6 +8,8 @@
 (define aliens/row 11)
 (define alien-width (* 12 unit-width))
 (define alien-height (* 8 unit-height))
+(define x-move (* 4 unit-width))
+(define y-move (* 8 unit-height))
 
 ;; generic fold function for vectors
 ;; ought to work exactly like fold-left in R6RS
@@ -19,9 +21,12 @@
         (loop (+ i 1)
               (apply proc acc (map (lambda (v) (vector-ref v i)) vec)))))))
 
+(define (kill? x)
+  (and (integer? x) (positive? x)))
+
 ;;; adt for a single alien object
 ;;; requires an x-coordinate, identifier, and an integer for alien type
-(define (alien-adt x make-id type)
+(define (alien-adt y make-id type)
   (let*
     ;; identifier to store state needed by the window adt
     ((id (make-id type))
@@ -34,37 +39,33 @@
      (points (* 100 health))
 
      ;; is it alive?
-     (alive? #t)
+     (alive?
+       (lambda ()
+         (positive? health)))
 
      ;; this kills the alien
      ;; or damages it if it still has health left
-     (kill!
+     (hit!
        (lambda ()
-         (if (> health 1)
-           ;; when there's still health left
-           ;; subtract 1, and return a score of 0 points
-           (begin (set! health (- health 1))
-                  0)
-           ;; otherwise, set alive? to false and return the score value
-           (begin (set! alive? #f)
-                  points))))
+         (if (not (alive?))
+           #f
+           (begin
+             (set! health (- health 1))
+             (if (alive?) 0 points)))))
 
-     ;; moves the alien on the x-axis
-     ;; position on the y-axis is stored in the alien-row adt
+     ;; moves the alien on the y-axis
+     ;; position on the x-axis is stored in the alien-column adt
      (move!
-       (let ((x-diff (* 2 unit-width)))
-         (lambda (direction)
-           (case direction
-             ((left)  (set! x (- x x-diff)))
-             ((right) (set! x (+ x x-diff)))))))
+       (lambda ()
+         (set! y (+ y y-move))))
      
      ;; draws and animates the alien
      ;; requires window adt and y coordinate
      (draw!
-       (lambda (window y)
+       (lambda (window x)
          (cond
            ;; if alive, just draw and animate
-           (alive?
+           ((alive?)
              ((window 'draw!) id x y)
              ((window 'animate!) id))
            ;; if health is 1, remove alien graphic
@@ -84,9 +85,9 @@
      (dispatch
        (lambda (msg)
          (case msg
-           ((x) x)
-           ((alive?) alive?)
-           ((kill!)  kill!)
+           ((y) y)
+           ((alive?) (alive?))
+           ((hit!)   hit!)
            ((move!)  move!)
            ((draw!)  draw!)
            (else
@@ -98,148 +99,141 @@
 
 
 ;;; adt that stores a 1 dimensional vector of aliens
-;;; requires everything a single alien needs, plus a y coordinate
-(define (alien-row x y make-id type)
+;;; requires everything a single alien needs, plus a x coordinate
+(define (alien-column x y make-id)
   (let*
-    ((alive? #t)
-
-     ;; the aliens are stored in a vector
+    (;; the aliens are stored in a vector
      ;; builds it using the alien-adt from above
      (aliens
        (build-vector
-         aliens/row
+         aliens/column
          (lambda (i)
-           (alien-adt (+ x (* 4/3 i alien-width)) make-id type))))
+           (alien-adt (* 2 i alien-height) make-id (- aliens/column i 1)))))
+
+    ;; number of aliens alive, 0 means column is empty
+    (alive aliens/column)
+     (alive?
+       (lambda ()
+         (positive? alive)))
 
      ;; like vector-ref
      (alien-ref
        (lambda (idx)
          (vector-ref aliens idx)))
 
-     ;; leftmost active alien in the row
-     (leftmost  0)
+     ;; top-most active alien in the row
+     (top-most  0)
 
-     ;; rightmost active alien in the row
+     ;; bottom-most active alien in the row
      ;; default depends on length of row
-     (rightmost (- aliens/row 1))
+     (bottom-most (- aliens/column 1))
 
-     ;; updates leftmost to new leftmost active alien
-     (set-leftmost!
+     ;; updates top-most to new top-most active alien
+     (update-top-most!
        (lambda ()
-         (let loop ((i (+ leftmost 1)))
+         (let loop ((i (+ top-most 1)))
            (cond (((alien-ref i) 'alive?)
-                  (set! leftmost i))
+                  (set! top-most i))
                  (else (loop (+ i 1)))))))
 
-     ;; updates rightmost to new rightmost active alien
-     (set-rightmost!
+     ;; updates bottom-most to new bottom-most active alien
+     (update-bottom-most!
        (lambda ()
-         (let loop ((i (- rightmost 1)))
+         (let loop ((i (- bottom-most 1)))
            (cond (((alien-ref i) 'alive?)
-                  (set! rightmost i))
+                  (set! bottom-most i))
                  (else (loop (- i 1)))))))
 
      ;; incoming shot
-     ;; uses binary search to see if it hit an active alien in the vector
      (shot!
-       (lambda (b-x)
-         (let bsearch ((i leftmost) (j rightmost))
-           (if (> i j)
-             #f
-             (let* ((idx  (quotient (+ i j) 2))
-                    (aln  (alien-ref idx))
-                    (a-x1 (aln 'x))
-                    (a-x2 (+ a-x1 alien-width)))
-               (cond ((< b-x a-x1)
-                      (bsearch i (- idx 1)))
-                     ((> b-x a-x2)
-                      (bsearch (+ idx 1) j))
-                     ((aln 'alive?)
-                      ;; check score value to determine outcome
-                      (let ((score ((aln 'kill!))))
+       (lambda (b-y)
+         (if (not (alive?))
+           #f
+           (let loop ((i bottom-most))
+             (if (< i top-most)
+               #f
+               (let* ((alien (alien-ref i))
+                      (a-y   (alien 'y)))
+                  (if (or (< b-y a-y)
+                          (> b-y (+ a-y alien-height)))
+                    ;; shot missed, continue looking
+                    (loop (- i 1))
+                    ;; returns the result of a hit
+                    ;; an integer if the alien's still alive
+                    ;; positive integer if it's also a kill
+                    ;; #f if it's already dead
+                    (let ((result ((alien 'hit!))))
+                      (when (and (integer? result) (positive? result))
+                        (set! alive (- alive 1))
                         (cond
-                          ;; zero means no kill
-                          ((zero? score) (void))
-                          ;; if true, every alien in this row is dead
-                          ;; so set alive? to false
-                          ((= leftmost rightmost) (set! alive? #f))
-                          ;; if leftmost alien was killed, set new leftmost
-                          ((= idx leftmost)  (set-leftmost!))
-                          ;; if rightmost alien was killed, set new rightmost
-                          ((= idx rightmost) (set-rightmost!)))
-                        ;; returns score the game will add
-                        score))
-                     ;; no hits, so return false
-                     (else #f)))))))
-     
-     ;; moves the alien row within the window limits
+                          ((and (= i bottom-most) (alive?))
+                           (update-bottom-most!))
+                          ((and (= i top-most) (alive?))
+                           (update-top-most!))))
+                      result))))))))
+
+     ;; moves the alien column within the window limits
      (move!
-       ;; the swarm starts out moving to the right
-       (let ((direction 'right))
-         ;; min-x and max-x are the left and right most aliens of the swarm
-         ;; these are needed to stay in formation after taking losses
-         (lambda (min-x max-x)
-           (when alive?
-             (cond
-               ;; when swarm is going left and touches left border
-               ;; go down a step, and switch direction to right
-               ((and (<= min-x 0)
-                     (eq? direction 'left))
-                (set! y (+ y alien-height))
-                (set! direction 'right))
-               ;; when going right, and touching right border
-               ;; go down a step, and switch direction to left
-               ((and (>= max-x 1)
-                     (eq? direction 'right))
-                (set! y (+ y alien-height))
-                (set! direction 'left))
-               ;; else just move all aliens
-               (else
-                 (vector-map (lambda (a)
-                               ((a 'move!) direction)) aliens)))))))
+       (lambda (direction)
+         (when (alive?)
+           (if (eq? direction 'down)
+             (vector-map (lambda (a) ((a 'move!))) aliens)
+             (set! x ((if (eq? direction 'right) + -) x x-move))))))
 
      ;; maps draw! on all elements
      (draw!
        (lambda (window)
-         (vector-map (lambda (a) ((a 'draw!) window y)) aliens)))
+         (vector-map (lambda (a) ((a 'draw!) window x)) aliens)))
 
      (dispatch
        (lambda (msg)
          (case msg
-           ((y) y)
-           ((left-bound)  ((alien-ref leftmost) 'x))
-           ((right-bound) (+ ((alien-ref rightmost) 'x) alien-width))
-           ((alive?) alive?)
+           ((x) x)
+           ((top-bound)  ((alien-ref top-most) 'x))
+           ((bottom-bound) (+ ((alien-ref bottom-most) 'x) alien-width))
+           ((alive?) (alive?))
            ((shot!)  shot!)
            ((move!)  move!)
            ((draw!)  draw!)
            (else
              (raise-arguments-error
-               'alien-row
+               'alien-column
                "invalid argument"
                "given" msg))))))
     dispatch))
 
 
-;;; swarm-adt is a stack of alian-rows
+;;; swarm-adt is a row of alien-columns
 (define (swarm-adt make-id)
   (let* ((x 0)
          (y 0)
 
-         ;; builds a vector of alien-row datastructures
+         (game-over #f)
+
+         ;; builds a vector of alien-column datastructures
          (aliens (build-vector
-                   aliens/column
+                   aliens/row
                    (lambda (i)
-                     ;; calculates spacing between rows
-                     ;; and the type of alien they'll carry
-                     (alien-row x (+ (* -2 alien-height i)
-                                     (* 10 alien-height)) make-id i))))
+                     ;; calculates spacing between columns
+                     (alien-column (+ x (* i alien-width 4/3)) y make-id))))
 
-         ;; topmost row
-         (top (- aliens/column 1))
+         ;; left column
+         (left 0)
+         (update-left!
+           (lambda ()
+             (let loop ((i (+ left 1)))
+               (if ((vector-ref aliens i) 'alive?)
+                 (set! left i)
+                 (loop (+ i 1))))))
 
-         ;; bottom row
-         (bottom 0)
+         ;; right column
+         (right (- aliens/row 1))
+         (update-right!
+           (lambda ()
+             (let loop ((i (- right 1)))
+               (if ((vector-ref aliens i) 'alive?)
+                 (set! right i)
+                 (loop (- i 1))))))
 
          ;; intitial speed depends on amount of aliens
          (speed (* aliens/column aliens/row 16))
@@ -249,49 +243,67 @@
            (lambda ()
              (set! speed (- speed 8))))
 
-         ;; checks from bottom to top if any bullet can hit something
+         ;; checks from left to right if any bullet can hit something
          (shot!
-           (lambda (b-x b-y)
-             ;; gets the score value, if any
-             ;; no hit is false
-             ;; a hit returns an integer
-             (let ((hit?
-                     (let loop ((i bottom))
-                       (if (> i top)
-                         #f
-                         (let* ((a-row (vector-ref aliens i))
-                                (a-y (a-row 'y)))
-                           (if (or (< b-y a-y)
-                                   (> b-y (+ a-y alien-height)))
-                             (loop (+ i 1))
-                             ((a-row 'shot!) b-x)))))))
-               ;; when there's a hit, increase speed
-               (when hit?
-                 (speed!))
-               ;; return the score value
-               hit?)))
+           (let ((victory #f))
+             (lambda (b-x b-y)
+               ;; gets the score value, if any
+               ;; no hit is false
+               ;; a hit returns an integer
+               (let ((result
+                       (let loop ((i left))
+                         (if (> i right)
+                           #f
+                           (let* ((column (vector-ref aliens i))
+                                  (a-x (column 'x)))
+                             (if (and (>= b-x a-x)
+                                      (<= b-x (+ a-x alien-width)))
+                               (let ((hit ((column 'shot!) b-y)))
+                                 (when (and (kill? hit)
+                                            (not (column 'alive?))
+                                            (or (= i left) (= i right)))
+                                   (cond
+                                     ((= left right)
+                                      (set! victory #t))
+                                     ((= i left)
+                                      (update-left!))
+                                     ((= i right)
+                                      (update-right!))))
+                                 hit)
+                               (loop (+ i 1))))))))
+                 ;; when there's a kill, increase speed
+                 (when (kill? result)
+                   (speed!))
+                 ;; returns the result of the shot and victory state
+                 (values result victory)))))
 
-         ;; moves all the rows
+         ;; moves all the columns
          ;; also gets the left and right most active aliens in the swarm
          ;; for bound checking purposes
          (move!
-           (lambda ()
-             (let ((min-x (vector-fold (lambda (acc x)
-                                         (if (x 'alive?)
-                                           (min acc (x 'left-bound))
-                                           acc))
-                                         1 aliens))
-                   (max-x (vector-fold (lambda (acc x)
-                                         (if (x 'alive?)
-                                           (max acc (x 'right-bound))
-                                           acc))
-                                         0 aliens)))
-               (vector-map (lambda (row) ((row 'move!) min-x max-x)) aliens))))
+           (let ((down #f)
+                 (direction 'right))
+             (lambda ()
+               (let* ((left-bound  ((vector-ref aliens left) 'x))
+                      (right-bound (+ ((vector-ref aliens right) 'x) alien-width)))
+                 (cond
+                   ((<= left-bound 0)
+                    (if down
+                      (set!-values (down direction) (values #f 'down))
+                      (set!-values (down direction) (values #t 'right))))
+                   ((>= right-bound 1)
+                    (if down
+                      (set!-values (down direction) (values #f 'down))
+                      (set!-values (down direction) (values #t 'left)))))
+                 (vector-map (lambda (column) ((column 'move!) direction)) aliens)))))
+    ;         (let ((min-x ((vector-ref aliens left) 'x))
+    ;               (max-x ((vector-ref aliens right) 'x)))
+    ;           (vector-map (lambda (column) ((column 'move!) min-x max-x)) aliens))))
 
          ;; draws the aliens
          (draw!
            (lambda (window)
-             (vector-map (lambda (row) ((row 'draw!) window)) aliens)))
+             (vector-map (lambda (column) ((column 'draw!) window)) aliens)))
 
          (dispatch
            (lambda (msg)
