@@ -21,14 +21,44 @@
          (player-layer (window 'make-layer))
          (bullet-layer (window 'make-layer))
          (alien-layer  (window 'make-layer))
+         (menu-layer   (window 'make-layer))
+
+        ; (menu
+         ;  (let ((tile (make-bitmap-tile "./menu.png")))
+          ;   ((menu-layer 'add-drawable) tile)
+           ;  tile))
 
          (type-from-id car)
          (tile-from-id cdr)
 
+         (menu-id
+           (lambda ()
+             (let ((tile (make-bitmap-tile "../gfx/menu.png")))
+               ((menu-layer 'add-drawable) tile)
+               (cons 'menu tile))))
+
+         (pointer-id
+           (lambda ()
+             (let ((tile (make-bitmap-tile "../gfx/pointer.png")))
+               ((menu-layer 'add-drawable) tile)
+               (cons 'menu tile))))
+
+         (start-id
+           (lambda ()
+             (let ((tile (make-bitmap-tile "../gfx/start.png")))
+               ((menu-layer 'add-drawable) tile)
+               (cons 'menu tile))))
+         
+         (exit-id
+           (lambda ()
+             (let ((tile (make-bitmap-tile "../gfx/exit.png")))
+               ((menu-layer 'add-drawable) tile)
+               (cons 'menu tile))))
+
          (player-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/player.png"
-                                          "../gfx/player-mask.png")))
+                                           "../gfx/player-mask.png")))
                ((player-layer 'add-drawable) tile)
                (cons 'player tile))))
 
@@ -43,7 +73,6 @@
              (let ((tile (if (negative? species-number)
                           (invader-death)
                           (case (modulo species-number 5)
-                            ;((0) (invader-death))
                             ((0) (invader-R1))
                             ((1) (invader-B1))
                             ((2) (invader-B2))
@@ -86,12 +115,27 @@
            (lambda (proc)
              ((window 'set-key-release-callback!) proc)))
 
+         (clear-game!
+           (lambda ()
+             ((player-layer 'clear!))
+             ((bullet-layer 'clear!))
+             ((alien-layer  'clear!))))
+
+         (clear-menu!
+           (menu-layer 'clear!))
+
          (dispatch
            (lambda (msg)
              (case msg
+               ((clear-game!) clear-game!)
+               ((clear-menu!) clear-menu!)
                ((draw!)     draw!)
                ((remove!)   remove!)
                ((animate!)  animate!)
+               ((menu-id)   menu-id)
+               ((pointer-id) pointer-id)
+               ((start-id)  start-id)
+               ((exit-id)   exit-id)
                ((alien-id)  alien-id)
                ((player-id) player-id)
                ((bullet-id) bullet-id)

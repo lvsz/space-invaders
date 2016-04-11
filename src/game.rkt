@@ -19,6 +19,7 @@
 (define alien-shoot-coefficient 15/100)
 (define alien-shoot-chance (floor (* 100 (/ alien-shoot-coefficient))))
 
+
 ;;; abstract data type for the player's ship
 ;;; id and make-id are objects provided by window.rkt
 ;;; they are used to generate and save a unique identifier
@@ -40,45 +41,24 @@
 
      (shot!
        (lambda (x y)
-         (displayln lives)
          (if (zero? lives)
            (values #t #t)
            (begin
              (set! lives (- lives 1))
              (values #t #f)))))
 
-
-     ;; zero for no direction, -1 for left, 1 for right
-     (direction 0)
-
-     ;; changes direction for key press and release events
-     (direction!
-       ;; #f means the key isn't being pressed
-       ;; #t means the key is being pressed
-       (let ((left  #f)
-             (right #f))
-         ;; takes a symbol and a boolean
-         (lambda (key pressed)
-           (case key
-             ((left)  (set! left  pressed))
-             ((right) (set! right pressed)))
-           ;; adds left and right
-           ;; so direction is none when both or neither are pressed
-           (set! direction (+ (if left -1 0)
-                              (if right 1 0))))))
-
      ;; moves the ship within the window's limits
      (move!
        (let ((difference (* 2 unit-width))
              (left-border 0)
              (right-border (- 1 player-width)))
-         (lambda ()
+         (lambda (direction)
            (cond 
              ;; ship isn't touching right border, and it's going right
-             ((and (< x right-border) (= direction 1))
+             ((and (eq? direction 'right) (< x right-border))
               (set! x (+ x difference)))
              ;; ship isn't touching left border, and it's going left
-             ((and (> x left-border) (= direction -1))
+             ((and (eq? direction 'left) (> x left-border))
               (set! x (- x difference)))))))
 
      ;; sends draw message with id and coordinates to window adt
@@ -94,7 +74,6 @@
            ((x-bounds) (x-bounds))
            ((y-bounds) (y-bounds))
            ((shot!)      shot!)
-           ((direction!) direction!)
            ((move!)      move!)
            ((draw!)      draw!)
            (else
@@ -103,74 +82,6 @@
                "invalid argument"
                "given" msg))))))
     dispatch))
-
-
-#|
-;;; abstract data type for single bullets, used by the player
-;;; designed for every bullet to be created before the game begins
-;;; this saves resources because it doesn't have to create
-;;; a new bullet every time you call shoot!
-(define (bullet-adt make-id)
-  (let*
-    ;; identifier provided by the window adt
-    ((id (make-id))
-
-     ;; X and Y positions
-     ;; default X position is outside of the window, changes when shot
-     (x 1)
-     (y 0)
-
-     ;; state of the bullet
-     ;; shouldn't be drawn or damage things when it already exploded
-     ;; default is inactive, changes when shot
-     (exploded? #t)
-
-     ;; called when shot
-     ;; makes the bullet active
-     ;; and resets its coordinates
-     (reset!
-       (lambda (new-x new-y)
-         (set! exploded? #f)
-         (set! x new-x)
-         (set! y new-y)))
-
-     ;; upon hitting target, it moves off the screen again
-     (explode!
-       (lambda ()
-         (set! x 1)
-         (set! exploded? #t)))
-
-     ;; while active, the bullets moves upwards
-     (move!
-       (lambda ()
-         (unless exploded?
-           (set! y (- y bullet-height))
-           ;; inactivates the bullet upon hitting the top border
-           (when (< y 0)
-             (explode!)))))
-
-     ;; sends draw message with id and coordinates to window adt
-     (draw!
-       (lambda (window)
-         ((window 'draw!) id x y)))
-
-     (dispatch
-       (lambda (msg)
-         (case msg
-           ((x) x)
-           ((y) y)
-           ((exploded?) exploded?)
-           ((explode!)  explode!)
-           ((reset!)    reset!)
-           ((move!)     move!)
-           ((draw!)     draw!)
-           (else
-             (raise-arguments-error
-               'bullet-adt
-               "invalid argument"
-               "given" msg))))))
-    dispatch))
-|#
 
 
 (define (bullet-adt type x y make-id window)
@@ -213,6 +124,7 @@
                "given" msg))))))
     dispatch))
 
+
 ;; for-each function for mutable lists
 (define (mfor-each proc . mlists)
   (when (and (pair? mlists) (andmap mpair? mlists))
@@ -236,11 +148,6 @@
      (shoot!
        (lambda (type x y)
          (mappend! bullets (bullet-adt type x y make-id window))))
-      ;;   (set-mcdr! bullets (mcons (bullet-adt x y make-id window) (mcdr bullets)))))
-      ;;   (let ((new-bullet (mcons (bullet-adt x y make-id) '())))
-      ;;     (set-mcdr! last-bullet new-bullet)
-      ;;     (displayln bullets)
-      ;;     (set! last-bullet (mcdr last-bullet)))))
      (move!
        (lambda ()
          (when (mpair? (mcdr bullets))
@@ -271,214 +178,248 @@
     dispatch))
 
 
-
-
-
-#|
-;;; object that stores the individual bullets created at the start of the game
-;;; functions like an object pool, by using a circular data structure
-(define (bullets-adt make-id)
+(define (new-game window random?)
   (let*
-    ;; initialises every bullet
-    ;; build-ring functions like build-vector does
-    ((bullets (build-ring
-                bullet-limit
-                (lambda (_)
-                  (bullet-adt make-id))))
+    ((player  (player-adt  (window 'player-id)))
+     (bullets (bullets-adt (window 'bullet-id) window))
+     (aliens  (swarm-adt   (window 'alien-id)))
+     (score 0)
 
-     ;; for-each function for the bullet structure
-     ;; ignores exploded bullets
-     (bullet-for-each
-       (lambda (proc)
-         (ring-for-each
-           (lambda (b)
-             (unless (b 'exploded?) (proc b)))
-           bullets)))
+     (left #f)
+     (right #f)
 
-     ;; checks the current bullet in the structure
-     ;; can't shoot a new one while the others are still acive
-     (ready?
-       (lambda ()
-         ((ring-head bullets) 'exploded?)))
+     ;; boolean that tells if the shoot! key is being pressed
+     (shooting #f)
 
-     ;; shoots a bullet when ready
-     ;; requires x & y coordinates
-     ;; and changes the current bullet in the ring to the next one
+     ;; boolean that prevents shooting all bullets at once
+     (loaded? #t)
+
+     ;; function called when the player hits shoot!
      (shoot!
-       (lambda (x y)
-         (when (ready?)
-           (((ring-head bullets) 'reset!) x y)
-           (ring-next! bullets))))
-
-     ;; calls move! for each bullet
-     (move!
        (lambda ()
-         (ring-for-each (lambda (b) ((b 'move!))) bullets)))
+           ;; no more shooting till reloaded
+           (set! loaded? #f)
+           ;; start coordinates for the bullet
+           ;; x calculates the center of the player's ship
+           (let* ((x (+ (player 'x)
+                        (/ player-width 2)
+                        (- bullet-width)))
+                  (y (player 'y)))
+             ((bullets 'shoot!) 'player x y))))
 
-     ;; calls draw! for each bullet
-     (draw!
-       (lambda (window)
-         (ring-for-each (lambda (b) ((b 'draw!) window)) bullets)))
+     (up!
+       (lambda (state)
+         (set! shooting state)))
+     (left!
+       (lambda (state)
+         (set! left state)))
+     (right!
+       (lambda (state)
+         (set! right state)))
+
+     (reload-time 0)
+     (player-time player-speed)
+     (bullet-time bullet-speed)
+     (alien-time (aliens 'speed))
+     (game-loop
+       (lambda (delta-t)
+         ;; only used with random input activated
+         ;; used for test purposes
+         (when random?
+           (case (random 10)
+             ((0) (set! shooting #t))
+             ((1) (set! left #t))
+             ((2) (set! right #t))
+             ((3) (set! shooting #f))
+             ((4) (set! left #f))
+             ((5) (set! right #f))))
+
+         ;; when shooting, shoot
+         (when (and loaded? shooting)
+           (set! loaded? #f)
+           (shoot!))
+
+         ;; reloads gun
+         (set! reload-time (+ reload-time delta-t))
+         (when (and (not loaded?) (> reload-time reload-timer))
+           (set! loaded? #t)
+           (set! reload-time 0))
+
+         ;; moves the players ship
+         (set! player-time (+ player-time delta-t))
+         (when (> player-time player-speed)
+           ((player 'move!) (if left
+                              (unless right 'left)
+                              (when right 'right)))
+           ((player 'draw!) window)
+           (set! player-time 0))
+
+         ;; moves the aliens and controls their bullets
+         (set! alien-time (+ alien-time delta-t))
+         (when (> alien-time (aliens 'speed))
+           ((aliens 'move!))
+           (when (<= 100 (random alien-shoot-chance))
+             (let-values (((x y) (aliens 'shoot)))
+               ((bullets 'shoot!) 'alien x y)))
+           (set! alien-time 0)
+           ((aliens 'draw!) window))
+
+         ;; moves the bullets, and checks for collisions
+         (set! bullet-time (+ bullet-time delta-t))
+         (when (> bullet-time bullet-speed)
+           ;; gets the bounds of the alien swarm
+           ;; so it doesn't check for collisons when not near it
+           ((bullets 'for-each)
+            (lambda (b)
+              (let* ((x (b 'x))
+                     (y (b 'y))
+                     (type (b 'type))
+                     (target (if (eq? type 'player)
+                               aliens
+                               player)))
+                (let-values (((top bottom) (target 'y-bounds))
+                             ((left right) (target 'x-bounds)))
+                  (when (and (>= y bottom)
+                             (<= y top)
+                             (>= x left)
+                             (<= x right))
+                    (let-values (((shot game-over) ((target 'shot!) x y)))
+                      ;; shot returns #f when no hits
+                      ;; 0 for hitting but not killing an alien
+                      ;; score to be added for killing an alien
+                      (when shot
+                        ((b 'explode!))
+                        (when (not (eq? shot 0))
+                          ((target 'draw!) window)
+                          (when (eq? type 'player)
+                            (set! score (+ score shot))))
+                        (when game-over
+                          (displayln (if (eq? type 'player)
+                                       "YOU WIN"
+                                       "YOU LOSE"))
+                          (exit)))))))))
+           ((bullets 'move!))
+           ((bullets 'draw!))
+           (set! bullet-time 0))))
+
+     (clear!
+       (window 'clear-game!))
 
      (dispatch
        (lambda (msg)
          (case msg
-           ((for-each) bullet-for-each)
-           ((shoot!)   shoot!)
-           ((move!)    move!)
-           ((draw!)    draw!)
+           ((game-loop) game-loop)
+           ((up!)    up!)
+           ((left!)  left!)
+           ((right!) right!)
+           ((clear!) clear!)
            (else
              (raise-arguments-error
-               'bullets-adt
+               'game-loop
                "invalid argument"
                "given" msg))))))
     dispatch))
-|#
+
+
+(define (menu-adt window)
+  (let*
+    ((pointer ((window 'pointer-id)))
+     (start   ((window 'start-id)))
+     (exit    ((window 'exit-id)))
+     (menu    ((window 'menu-id)))
+     (pointer-x 1/4)
+     (pointer-y 2/5)
+     (start-x   1/3)
+     (start-y   2/5)
+     (exit-x    1/3)
+     (exit-y    3/5)
+     (draw!
+       (lambda ()
+         ((window 'draw!) pointer pointer-x pointer-y)
+         ((window 'draw!) start start-x start-y)
+         ((window 'draw!) exit exit-x exit-y)))
+     (up!
+       (lambda ()
+         (set! pointer-y start-y)))
+     (down!
+       (lambda ()
+         (set! pointer-y exit-y)))
+     (enter!
+       (lambda (start-f exit-f)
+         (if (= pointer-y start-y)
+           (start-f)
+           (exit-f))))
+     (clear!
+       (window 'clear-menu!))
+     (dispatch
+       (lambda (msg)
+         (case msg
+           ((draw!) draw!)
+           ((up!) up!)
+           ((down!) down!)
+           ((enter!) enter!)
+           ((clear!) clear!)))))
+     dispatch))
 
 
 ;;; initialises the game
 ;;; optional parameters for window name and random user input
 (define (game-init (name "Main") (random? #f))
-  (let* ((window  (window-adt name window-width window-height))
-         (player  (player-adt  (window 'player-id)))
-         (bullets (bullets-adt (window 'bullet-id) window))
-         (aliens  (swarm-adt   (window 'alien-id)))
-         (score 0)
+  (let*
+    ((window  (window-adt name window-width window-height))
+     (state 'menu)
+     (menu (menu-adt window))
+     (updated #f)
+     (updated? (lambda () updated))
+     (menu-loop
+       (lambda (delta-t)
+         (unless (updated?)
+           (set! updated #t)
+           ((menu 'draw!)))))
 
-         ;; boolean that prevents shooting all bullets at once
-         (loaded? #t)
+     (game (new-game window random?))
+     (start
+       (lambda ()
+         (set! state 'game)
+         ((menu 'clear!))
+         ((window 'set-game-loop-fun!) (game 'game-loop))))
+     (stop
+       (lambda ()
+         ((game 'clear!))
+         ((window 'set-game-loop-fun!) menu-loop)
+         (set! updated #f)
+         (set! menu (menu-adt window))
+         (set! game (new-game window random?))
+         (set! state 'menu)))
 
-         ;; boolean that tells if the shoot! key is being pressed
-         (shooting? #f)
+     ;; function that processes key press events
+     (key-fun
+       (lambda (key)
+         (if (eq? state 'game)
+           (case key
+             ((up #\space) ((game 'up!) #t))
+             ((left)    ((game 'left!)  #t))
+             ((right)   ((game 'right!) #t))
+             ((escape)  (stop)))
+           (case key
+             ((up)   (set! updated #f) ((menu 'up!)))
+             ((down) (set! updated #f) ((menu 'down!)))
+             ((#\return) ((menu 'enter!) start exit))
+             ((escape) (exit))))))
 
-         ;; function called when the player hits shoot!
-         (shoot!
-           (lambda ()
-             (when loaded?
-               ;; no more shooting till reloaded
-               (set! loaded? #f)
-               ;; start coordinates for the bullet
-               ;; x calculates the center of the player's ship
-               (let* ((x (+ (player 'x)
-                            (/ player-width 2)
-                            (- bullet-width)))
-                      (y (player 'y)))
-                 ((bullets 'shoot!) 'player x y)))))
+     ;; function that processes key release events
+     (release-fun
+       (lambda (key)
+         (when (eq? state 'game)
+           (case key
+             ((up #\space) ((game 'up!) #f))
+             ((left)    ((game 'left!)  #f))
+             ((right)   ((game 'right!) #f)))))))
 
-         ;; starts the game
-         (start
-           (lambda ()
-             (let* ((player-time 0)
-                    (bullet-time 0)
-                    (reload-time 0)
-                    (alien-time  0)
-                    (game-loop-fun
-                      (lambda (delta-t)
-                        ;; only used with random input activated
-                        ;; used for test purposes
-                        (when random?
-                          (case (random 10)
-                            ((0) (set! shooting? #t))
-                            ((1) ((player 'direction!) 'left #t))
-                            ((2) ((player 'direction!) 'right #t))
-                            ((3) (set! shooting? #f))
-                            ((4) ((player 'direction!) 'left #f))
-                            ((5) ((player 'direction!) 'right #f))))
+    ((window 'set-game-loop-fun!) menu-loop)
+    ((window 'set-key-fun!)       key-fun)
+    ((window 'set-key-release-fun!) release-fun)))
 
-                        ;; when shooting, shoot
-                        (when shooting?
-                          (shoot!))
-
-                        ;; reloads gun
-                        (set! reload-time (+ reload-time delta-t))
-                        (when (> reload-time reload-timer)
-                          (set! loaded? #t)
-                          (set! reload-time 0))
-
-                        ;; moves the players ship
-                        (set! player-time (+ player-time delta-t))
-                        (when (> player-time player-speed)
-                          ((player 'move!))
-                          ((player 'draw!) window)
-                          (set! player-time 0))
-
-                        ;; moves the aliens and controls their bullets
-                        (set! alien-time (+ alien-time delta-t))
-                        (when (> alien-time (aliens 'speed))
-                          ((aliens 'move!))
-                          (when (<= 100 (random alien-shoot-chance))
-                            (let-values (((x y) (aliens 'shoot)))
-                              ((bullets 'shoot!) 'alien x y)))
-                          (set! alien-time 0)
-                          ((aliens 'draw!) window))
-
-                        ;; moves the bullets, and checks for collisions
-                        (set! bullet-time (+ bullet-time delta-t))
-                        (when (> bullet-time bullet-speed)
-                          ;; gets the bounds of the alien swarm
-                          ;; so it doesn't check for collisons when not near it
-                          ((bullets 'for-each)
-                           (lambda (b)
-                             (let* ((x (b 'x))
-                                    (y (b 'y))
-                                    (type (b 'type))
-                                    (target (if (eq? type 'player)
-                                              aliens
-                                              player)))
-                               (let-values (((top bottom) (target 'y-bounds))
-                                            ((left right) (target 'x-bounds)))
-                                 (when (and (>= y bottom)
-                                            (<= y top)
-                                            (>= x left)
-                                            (<= x right))
-                                   (let-values (((shot game-over) ((target 'shot!) x y)))
-                                     ;; shot returns #f when no hits
-                                     ;; 0 for hitting but not killing an alien
-                                     ;; score to be added for killing an alien
-                                     (when shot
-                                       ((b 'explode!))
-                                       (when (not (eq? shot 0))
-                                         ((target 'draw!) window)
-                                         (when (eq? type 'player)
-                                           (set! score (+ score shot))))
-                                       (when game-over
-                                         (displayln (if (eq? type 'player)
-                                                      "YOU WIN"
-                                                      "YOU LOSE"))
-                                         (exit)))))))))
-                          ((bullets 'move!))
-                          ((bullets 'draw!))
-                          (set! bullet-time 0))))
-
-                    ;; function that processes key press events
-                    (key-fun
-                      (lambda (key)
-                        (case key
-                          ((up #\space) (set! shooting? #t))
-                          ((left)   ((player 'direction!) 'left #t))
-                          ((right)  ((player 'direction!) 'right #t))
-                          ((escape) (exit)))))
-
-                    ;; function that processes key release events
-                    (release-fun
-                      (lambda (key)
-                        (case key
-                          ((up #\space) (set! shooting? #f))
-                          ((left)  ((player 'direction!) 'left #f))
-                          ((right) ((player 'direction!) 'right #f))))))
-               ((window 'set-game-loop-fun!) game-loop-fun)
-               ((window 'set-key-release-fun!) release-fun)
-               ((window 'set-key-fun!) key-fun))))
-
-         (dispatch
-           (lambda (msg)
-             (case msg
-               ((start) (start))
-               ((score) (displayln score))
-               ((exit)  (exit))))))
-    dispatch))
-
-;; creates a game object and starts it
-(define game (game-init))
-(game 'start)
+;; starts game
+(game-init)
 

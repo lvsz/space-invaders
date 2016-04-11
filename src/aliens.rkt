@@ -36,12 +36,15 @@
      (health (+ (quotient type 2) 1))
 
      ;; points upon killing are based on initial health
-     (points (* 100 health))
+     (points (+ 100 (* 100 type)))
 
      ;; is it alive?
      (alive?
        (lambda ()
          (positive? health)))
+     
+     (exploded #f)
+     (cleared  #f)
 
      ;; this kills the alien
      ;; or damages it if it still has health left
@@ -66,21 +69,21 @@
          (cond
            ;; if alive, just draw and animate
            ((alive?)
-             ((window 'draw!) id x y)
-             ((window 'animate!) id))
+            ((window 'draw!) id x y)
+            ((window 'animate!) id))
            ;; if health is 1, remove alien graphic
            ;; then create a new id for the explosion animation
            ;; draws the explosion and sets health to 0
-           ((= health 1)
-             ((window 'remove!) id)
-             (set! id (make-id -1))
-             ((window 'draw!) id x y)
-             (set! health 0))
+           ((not exploded)
+            ((window 'remove!) id)
+            (set! id (make-id -1))
+            ((window 'draw!) id x y)
+            (set! exploded #t))
            ;; when health is 0, remove explosion graphic
            ;; then change health to -1, for which this conditional returns null
-           ((= health 0)
-             ((window 'remove!) id)
-             (set! health -1)))))
+           ((not cleared)
+            ((window 'remove!) id)
+            (set! cleared #t)))))
 
      (dispatch
        (lambda (msg)
