@@ -8,6 +8,9 @@
 (define aliens/row 11)
 (define alien-width (* 12 unit-width))
 (define alien-height (* 8 unit-height))
+(define horizontal-spacing (* alien-width 4/3))
+(define vertical-spacing   (* alien-height 2))
+
 (define x-move (* 4 unit-width))
 (define y-move (* 8 unit-height))
 
@@ -111,7 +114,7 @@
        (build-vector
          aliens/column
          (lambda (i)
-           (alien-adt (* 2 i alien-height) make-id (- aliens/column i 1)))))
+           (alien-adt (* i vertical-spacing) make-id (- aliens/column i 1)))))
 
     ;; number of aliens alive, 0 means column is empty
     (alive aliens/column)
@@ -218,7 +221,7 @@
                    aliens/row
                    (lambda (i)
                      ;; calculates spacing between columns
-                     (alien-column (+ x (* i alien-width 4/3)) y make-id))))
+                     (alien-column (+ x (* i horizontal-spacing)) y make-id))))
 
          ;; left column
          (left 0)
