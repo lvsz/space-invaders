@@ -633,6 +633,7 @@
       (set! drawables (remq drawable drawables))
       (redraw))
 
+    ;; Clears all drawables and redraws the layer
     (define (clear!)
       (set! drawables '())
       (redraw))

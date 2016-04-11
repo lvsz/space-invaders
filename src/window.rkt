@@ -17,8 +17,8 @@
 (define unit-width  1/224)
 (define unit-height 1/256)
 
-;; adt for the window, which connects the game to the graphics library
-;; requires a name and optionally non-standard dimensions
+;;; adt for the window, which connects the game to the graphics library
+;;; requires a name and optionally non-standard dimensions
 (define (window-adt name (width window-width) (height window-height))
   (let* ((window (make-window width height name))
          (player-layer (window 'make-layer))

@@ -8,9 +8,12 @@
 (define aliens/row 11)
 (define alien-width (* 12 unit-width))
 (define alien-height (* 8 unit-height))
+
+;; spacing between aliens when generating the swarm
 (define horizontal-spacing (* alien-width 4/3))
 (define vertical-spacing   (* alien-height 2))
 
+;; distance aliens move on every update
 (define x-move (* 4 unit-width))
 (define y-move (* 8 unit-height))
 
@@ -24,8 +27,10 @@
         (loop (+ i 1)
               (apply proc acc (map (lambda (v) (vector-ref v i)) vec)))))))
 
+;; when a bullet collision returns a positive integer, something got killed
 (define (kill? x)
   (and (integer? x) (positive? x)))
+
 
 ;;; adt for a single alien object
 ;;; requires an x-coordinate, identifier, and an integer for alien type
@@ -45,18 +50,22 @@
      (alive?
        (lambda ()
          (positive? health)))
-     
+
+     ;; becomes true when explode graphic gets drawn
      (exploded #f)
+     ;; becomes true after removing it from the screen
      (cleared  #f)
 
-     ;; this kills the alien
-     ;; or damages it if it still has health left
+     ;; checks if it hit
+     ;; false if already dead
+     ;; subtracts a health point otherwise
      (hit!
        (lambda ()
          (if (not (alive?))
            #f
            (begin
              (set! health (- health 1))
+             ; if it was a kill, return points, otherwise 0
              (if (alive?) 0 points)))))
 
      ;; moves the alien on the y-axis
@@ -70,20 +79,20 @@
      (draw!
        (lambda (window x)
          (cond
-           ;; if alive, just draw and animate
+           ; if alive, just draw and animate
            ((alive?)
             ((window 'draw!) id x y)
             ((window 'animate!) id))
-           ;; if health is 1, remove alien graphic
-           ;; then create a new id for the explosion animation
-           ;; draws the explosion and sets health to 0
+           ; if health is 1, remove alien graphic
+           ; then create a new id for the explosion animation
+           ; draws the explosion and sets health to 0
            ((not exploded)
             ((window 'remove!) id)
             (set! id (make-id -1))
             ((window 'draw!) id x y)
             (set! exploded #t))
-           ;; when health is 0, remove explosion graphic
-           ;; then change health to -1, for which this conditional returns null
+           ; when health is 0, remove explosion graphic
+           ; then change health to -1, for which this conditional returns null
            ((not cleared)
             ((window 'remove!) id)
             (set! cleared #t)))))
@@ -162,12 +171,12 @@
                       (a-y   (alien 'y)))
                   (if (or (< b-y a-y)
                           (> b-y (+ a-y alien-height)))
-                    ;; shot missed, continue looking
+                    ; shot missed, continue looking
                     (loop (- i 1))
-                    ;; returns the result of a hit
-                    ;; an integer if the alien's still alive
-                    ;; positive integer if it's also a kill
-                    ;; #f if it's already dead
+                    ; returns the result of a hit
+                    ; an integer if the alien's still alive
+                    ; positive integer if it's also a kill
+                    ; #f if it's already dead
                     (let ((result ((alien 'hit!))))
                       (when (kill? result)
                         (set! alive (- alive 1))
@@ -183,7 +192,9 @@
        (lambda (direction)
          (when (alive?)
            (if (eq? direction 'down)
+             ; when moving down, move all aliens
              (vector-map (lambda (a) ((a 'move!))) aliens)
+             ; otherwise just change x-coordinate of column
              (set! x ((if (eq? direction 'right) + -) x x-move))))))
 
      ;; maps draw! on all elements
@@ -241,6 +252,8 @@
                  (set! right i)
                  (loop (- i 1))))))
 
+         ;; when called, it returns 2 values, an X and Y coordinate
+         ;; meant to get coordinates for a new bullet
          (shoot
            (lambda ()
              (let loop ((i (- (random (+ left 1) (+ right 2)) 1)))
@@ -248,7 +261,6 @@
                  (values (+ ((vector-ref aliens i) 'x) (/ alien-width 2))
                          ((vector-ref aliens i) 'bottom-bound))
                  (loop (- (random (+ left 1) (+ right 2)) 1))))))
-
 
          ;; intitial speed depends on amount of aliens
          (speed (* aliens/column aliens/row 16))
@@ -268,52 +280,67 @@
                (let ((result
                        (let loop ((i left))
                          (if (> i right)
+                           ; missed all columns, no hit
                            #f
+                           ; check if it hit this column
                            (let* ((column (vector-ref aliens i))
                                   (a-x (column 'x)))
                              (if (and (>= b-x a-x)
                                       (<= b-x (+ a-x alien-width)))
+                               ; if it hit the column, get result
                                (let ((hit ((column 'shot!) b-y)))
-                                 (when (and (kill? hit)
-                                            (not (column 'alive?))
+                                 ; true if the column that got hit
+                                 ; was most left or right one
+                                 ; and no no longer alive
+                                 (when (and (not (column 'alive?))
                                             (or (= i left) (= i right)))
                                    (cond
+                                     ; column that died was last one
+                                     ; so player wins
                                      ((= left right)
                                       (set! victory #t))
+                                     ; left column died, so update
                                      ((= i left)
                                       (update-left!))
+                                     ; right column died so update
                                      ((= i right)
                                       (update-right!))))
                                  hit)
+                               ; didn't hit column, keep looking
                                (loop (+ i 1))))))))
-                 ;; when there's a kill, increase speed
+                 ; when there's a kill, increase speed
                  (when (kill? result)
                    (speed!))
-                 ;; returns the result of the shot and victory state
+                 ; returns the result of the shot and victory state
                  (values result victory)))))
 
          ;; moves all the columns
          ;; also gets the left and right most active aliens in the swarm
          ;; for bound checking purposes
          (move!
-           (let ((down #f)
+           (let (; when hitting the edge of the screen
+                 ; down decides if swarm moves down or changes direction
+                 (down #f)
+                 ; direction can be left, right, or down
                  (direction 'right))
              (lambda ()
-               (let* ((left-bound  ((vector-ref aliens left) 'x))
-                      (right-bound (+ ((vector-ref aliens right) 'x) alien-width)))
+               ; get the bounds of the outer columns
+               (let ((left-bound  ((vector-ref aliens left) 'x))
+                     (right-bound (+ ((vector-ref aliens right) 'x) alien-width)))
+                 ; direction can only change when touching the side of the screen
                  (cond
+                   ; when left column touches left side of screen
                    ((<= left-bound 0)
                     (if down
                       (set!-values (down direction) (values #f 'down))
                       (set!-values (down direction) (values #t 'right))))
+                   ; when right column touches right side of screen
                    ((>= right-bound 1)
                     (if down
                       (set!-values (down direction) (values #f 'down))
                       (set!-values (down direction) (values #t 'left)))))
+                 ; move all columns in current direction
                  (vector-map (lambda (column) ((column 'move!) direction)) aliens)))))
-    ;         (let ((min-x ((vector-ref aliens left) 'x))
-    ;               (max-x ((vector-ref aliens right) 'x)))
-    ;           (vector-map (lambda (column) ((column 'move!) min-x max-x)) aliens))))
 
          ;; draws the aliens
          (draw!
