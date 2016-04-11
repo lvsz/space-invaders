@@ -11,6 +11,10 @@
 (define player-height (*  8 unit-height))
 (define bullet-width  (*  1 unit-width))
 (define bullet-height (*  3 unit-height))
+(define menu-item-width  (* 52 unit-width))
+(define menu-item-height (* 12 unit-height))
+(define pointer-width    (* 7 unit-width))
+(define pointer-height   menu-item-height)
 
 (define player-speed 30)
 (define bullet-speed 15)
@@ -192,13 +196,13 @@
      (shooting #f)
 
      ;; boolean that prevents shooting all bullets at once
-     (loaded? #t)
+     (loaded #t)
 
      ;; function called when the player hits shoot!
      (shoot!
        (lambda ()
            ;; no more shooting till reloaded
-           (set! loaded? #f)
+           (set! loaded #f)
            ;; start coordinates for the bullet
            ;; x calculates the center of the player's ship
            (let* ((x (+ (player 'x)
@@ -235,14 +239,13 @@
              ((5) (set! right #f))))
 
          ;; when shooting, shoot
-         (when (and loaded? shooting)
-           (set! loaded? #f)
+         (when loaded
            (shoot!))
 
          ;; reloads gun
          (set! reload-time (+ reload-time delta-t))
-         (when (and (not loaded?) (> reload-time reload-timer))
-           (set! loaded? #t)
+         (when (and (not loaded) (> reload-time reload-timer))
+           (set! loaded #t)
            (set! reload-time 0))
 
          ;; moves the players ship
@@ -332,7 +335,7 @@
      (start-x   1/3)
      (start-y   2/5)
      (exit-x    1/3)
-     (exit-y    3/5)
+     (exit-y    1/2)
      (draw!
        (lambda ()
          ((window 'draw!) pointer pointer-x pointer-y)
