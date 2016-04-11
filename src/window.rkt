@@ -23,11 +23,6 @@
          (alien-layer  (window 'make-layer))
          (menu-layer   (window 'make-layer))
 
-        ; (menu
-         ;  (let ((tile (make-bitmap-tile "./menu.png")))
-          ;   ((menu-layer 'add-drawable) tile)
-           ;  tile))
-
          (type-from-id car)
          (tile-from-id cdr)
 
