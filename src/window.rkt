@@ -13,43 +13,53 @@
 (define window-width 224)
 (define window-height 256)
 
+;; with standard settings, 1 unit = 1 pixel
 (define unit-width  1/224)
 (define unit-height 1/256)
 
-(define (window-adt name width height)
+;; adt for the window, which connects the game to the graphics library
+;; requires a name and optionally non-standard dimensions
+(define (window-adt name (width window-width) (height window-height))
   (let* ((window (make-window width height name))
          (player-layer (window 'make-layer))
          (bullet-layer (window 'make-layer))
          (alien-layer  (window 'make-layer))
          (menu-layer   (window 'make-layer))
 
+         ;; accessors for ids
          (type-from-id car)
          (tile-from-id cdr)
 
+         ;; ids are cons cells with their type and bitmap-tile
+         ;; id for menu background
          (menu-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/menu.png")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
+         ;; id for menu pointer
          (pointer-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/pointer.png")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
+         ;; id for the menu's start item
          (start-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/start.png")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
          
+         ;; id for the menu's exit item
          (exit-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/exit.png")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
+         ;; id for the player's ship
          (player-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/player.png"
@@ -57,12 +67,15 @@
                ((player-layer 'add-drawable) tile)
                (cons 'player tile))))
 
+         ;; id for bullets
          (bullet-id
            (lambda ()
              (let ((tile (make-bitmap-tile "../gfx/bullet.png")))
                ((bullet-layer 'add-drawable) tile)
                (cons 'bullet tile))))
 
+         ;; id for an alien
+         ;; requires an integer to specify what graphic to use
          (alien-id
            (lambda (species-number)
              (let ((tile (if (negative? species-number)
@@ -76,11 +89,14 @@
                ((alien-layer 'add-drawable) tile)
                (cons 'alien  tile))))
 
+         ;; animates bitmap-tiles that support it
          (animate!
            (lambda (id)
              (let ((tile (tile-from-id id)))
                (tile 'set-next!))))
 
+         ;; generic draw method
+         ;; requires the id and coordinates
          (draw!
            (lambda (id x y)
              (let ((tile (tile-from-id id))
@@ -89,58 +105,67 @@
                ((tile 'set-x!) pos-x)
                ((tile 'set-y!) pos-y))))
 
+         ;; removes a bitmap-tile from the screen
          (remove!
            (lambda (id)
              (let ((tile (tile-from-id id))
                    (type (type-from-id id)))
                (case type
+                 ((menu)   ((menu-layer   'remove-drawable) tile))
                  ((alien)  ((alien-layer  'remove-drawable) tile))
                  ((player) ((player-layer 'remove-drawable) tile))
                  ((bullet) ((bullet-layer 'remove-drawable) tile))))))
 
+         ;; sets the main loop function
          (set-game-loop-fun!
            (lambda (proc)
              ((window 'set-update-callback!) proc)))
 
+         ;; sets the key press function
          (set-key-fun!
            (lambda (proc)
              ((window 'set-key-callback!) proc)))
 
+         ;; sets the key release function
          (set-key-release-fun!
            (lambda (proc)
              ((window 'set-key-release-callback!) proc)))
 
+         ;; clears menu layer
+         (clear-menu!
+           (menu-layer 'clear!))
+
+         ;; clears all game layers
          (clear-game!
            (lambda ()
              ((player-layer 'clear!))
              ((bullet-layer 'clear!))
              ((alien-layer  'clear!))))
 
-         (clear-menu!
-           (menu-layer 'clear!))
-
          (dispatch
            (lambda (msg)
              (case msg
-               ((clear-game!) clear-game!)
-               ((clear-menu!) clear-menu!)
-               ((draw!)     draw!)
-               ((remove!)   remove!)
-               ((animate!)  animate!)
-               ((menu-id)   menu-id)
+               ((draw!)      draw!)
+               ((remove!)    remove!)
+               ((animate!)   animate!)
+               ((menu-id)    menu-id)
                ((pointer-id) pointer-id)
-               ((start-id)  start-id)
-               ((exit-id)   exit-id)
-               ((alien-id)  alien-id)
-               ((player-id) player-id)
-               ((bullet-id) bullet-id)
+               ((start-id)   start-id)
+               ((exit-id)    exit-id)
+               ((alien-id)   alien-id)
+               ((player-id)  player-id)
+               ((bullet-id)  bullet-id)
                ((set-key-fun!)         set-key-fun!)
                ((set-key-release-fun!) set-key-release-fun!)
                ((set-game-loop-fun!)   set-game-loop-fun!)
+               ((clear-game!)          clear-game!)
+               ((clear-menu!)          clear-menu!)
                (else
                  (raise-arguments-error 'window-adt
                                         "invalid argument"
                                         "given" msg))))))
+
+    ;; defaults to black background on creation
     ((window 'set-background!) "black")
     dispatch))
 

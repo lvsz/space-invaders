@@ -16,13 +16,18 @@
 (define pointer-width    (* 7 unit-width))
 (define pointer-height   menu-item-height)
 
+;; time between updates in miliseconds
 (define player-speed 30)
 (define bullet-speed 15)
-(define bullet-limit  7)
-(define reload-timer 300)
-(define alien-shoot-coefficient 15/100)
-(define alien-shoot-chance (floor (* 100 (/ alien-shoot-coefficient))))
 
+;; time it takes for the player to reload in miliseconds
+(define reload-timer 300)
+
+;; modifies the rate at which the invaders will shoot after moving
+;; requires an integer
+;; 0 or smaller means 0% chance of a shot
+;; 100 or larger means 100% chance of a shot
+(define alien-shoot-chance 50)
 
 ;;; abstract data type for the player's ship
 ;;; id and make-id are objects provided by window.rkt
@@ -31,11 +36,17 @@
 (define (player-adt make-id)
   (let*
     ((id (make-id))
+
+     ;; player lives
+     ;; game over when hit with 0 left
      (lives 3)
 
      ;; default X and Y positions
      (x (- 1/2 (/ player-width 2)))
      (y 9/10)
+
+     ;; bounds of the player's hitbox
+     ;; gets called for collision checking
      (x-bounds
        (lambda ()
          (values x (+ x player-width))))
@@ -43,25 +54,33 @@
        (lambda ()
          (values (+ y player-height) y)))
 
+     ;; gets called when hit by a bullet
+     ;; returns 2 values
+     ;; first one if it hit (currently can't return false)
+     ;; second one is true if the game ends, false otherwise
      (shot!
        (lambda (x y)
          (if (zero? lives)
-           (values #t #t)
+           ; bullet hit and game over
+           (values #t #t) 
+           ; bullet hit, lost a life, game continues
            (begin
              (set! lives (- lives 1))
              (values #t #f)))))
 
      ;; moves the ship within the window's limits
+     ;; only takes the symbols 'left and 'right as arguments
+     ;; others get ignored
      (move!
        (let ((difference (* 2 unit-width))
              (left-border 0)
              (right-border (- 1 player-width)))
          (lambda (direction)
            (cond 
-             ;; ship isn't touching right border, and it's going right
+             ; ship isn't touching right border, and it's going right
              ((and (eq? direction 'right) (< x right-border))
               (set! x (+ x difference)))
-             ;; ship isn't touching left border, and it's going left
+             ; ship isn't touching left border, and it's going left
              ((and (eq? direction 'left) (> x left-border))
               (set! x (- x difference)))))))
 
@@ -88,21 +107,34 @@
     dispatch))
 
 
+;;; bullet adt
+;;; type can either be player or alien
+;;; also requires coordinates and id gemerator
+;;; window is needed to remove the bullet's image after it hit something
 (define (bullet-adt type x y make-id window)
   (let*
     ((id (make-id))
-     (active? #t)
+
+     ;; when true, the bullet moves and gets drawn
+     ;; when false, the data structure it's located in can safely delete it
+     (active #t)
+
+     ;; makes it inactive and removes it from the window
      (explode!
        (lambda ()
-         (set! active? #f)
+         (set! active #f)
          ((window 'remove!) id)))
 
+     ;; +/- decides whether the bullet's moving up or down
+     ;; player bullets move up, others down
      (+/- (if (eq? type 'player) - +))
+
+     ;; moves the bullet when active
      (move!
        (lambda ()
-         (when active?
+         (when active
            (set! y (+/- y bullet-height))
-           ;; inactivates the bullet upon hitting the top border
+           ; inactivates the bullet upon hitting the top border
            (unless (< 0 y 1)
              (explode!)))))
 
@@ -117,7 +149,7 @@
            ((x) x)
            ((y) y)
            ((type)      type)
-           ((active?)   active?)
+           ((active?)   active)
            ((explode!)  explode!)
            ((move!)     move!)
            ((draw!)     draw!)
@@ -128,6 +160,9 @@
                "given" msg))))))
     dispatch))
 
+
+;;; some helper functions for the bullets-adt, which relies on mutable lists
+;;; may get moved to a seperate module because they're generic
 
 ;; for-each function for mutable lists
 (define (mfor-each proc . mlists)
@@ -142,31 +177,52 @@
     (mappend! (mcdr mlist) element)))
 
 
+;;; the bullets adt is a data structure that holds and modifies every bullet
+;;; the make-id function is needed to generate new bullets
+;;; window is needed to clear their graphics
 (define (bullets-adt make-id window)
   (let*
-    ((bullets (mcons 'bullets '()))
+    (;; starts by making a headed mutable list
+     (bullets (mcons 'bullets '()))
+
+     ;; a for-each function that only needs a procedure
      (bullet-for-each
        (lambda (proc)
          (mfor-each proc (mcdr bullets))))
-     (ready? #t)
+
+     ;; shoot! creates a new bullet and adds it to the structure
+     ;; type can be either player or alien
      (shoot!
        (lambda (type x y)
          (mappend! bullets (bullet-adt type x y make-id window))))
+
+     ;; goes through all bullets till it finds an active one
+     ;; the ones before get removed from the list
+     (clean-up!
+       (lambda ()
+         (let loop ((active-bullets (mcdr bullets)))
+           (cond
+             ((null? active-bullets)
+              (set-mcdr! bullets '()))
+             (((mcar active-bullets) 'active?)
+              (set-mcdr! bullets active-bullets))
+             (else
+              (loop (mcdr active-bullets)))))))
+
+     ;; move! first tries to clean up any inactive bullets
+     ;; then calls move! on the remaining one
      (move!
        (lambda ()
+         ; make sure there are any bullets to move
          (when (mpair? (mcdr bullets))
-           (let loop ((active-bullets (mcdr bullets)))
-             (cond
-               ((null? active-bullets)
-                (set-mcdr! bullets '()))
-               (((mcar active-bullets) 'active?)
-                (set-mcdr! bullets active-bullets)
-                (bullet-for-each (lambda (b) ((b 'move!)))))
-               (else
-                (loop (mcdr active-bullets))))))))
+           (clean-up!)
+           (bullet-for-each (lambda (b) ((b 'move!)))))))
+
+     ;; draws! all bullets
      (draw!
        (lambda ()
          (bullet-for-each (lambda (b) ((b 'draw!))))))
+
      (dispatch
        (lambda (msg)
          (case msg
@@ -182,15 +238,16 @@
     dispatch))
 
 
+;;; generates everything needed to start a new game
+;;; can return a game-loop and key functions
 (define (new-game window random?)
   (let*
     ((player  (player-adt  (window 'player-id)))
      (bullets (bullets-adt (window 'bullet-id) window))
      (aliens  (swarm-adt   (window 'alien-id)))
-     (score 0)
 
-     (left #f)
-     (right #f)
+     ;; keeps the score of the current game
+     (score 0)
 
      ;; boolean that tells if the shoot! key is being pressed
      (shooting #f)
@@ -198,9 +255,10 @@
      ;; boolean that prevents shooting all bullets at once
      (loaded #t)
 
-     ;; function called when the player hits shoot!
+     ;; when called, generates a new bullet for the player
      (shoot!
        (lambda ()
+         (when loaded
            ;; no more shooting till reloaded
            (set! loaded #f)
            ;; start coordinates for the bullet
@@ -209,8 +267,14 @@
                         (/ player-width 2)
                         (- bullet-width)))
                   (y (player 'y)))
-             ((bullets 'shoot!) 'player x y))))
+             ((bullets 'shoot!) 'player x y)))))
 
+     ;; booleans to indicate player direction
+     (left #f)
+     (right #f)
+
+     ;; functions to be called on user input
+     ;; changes the values that control the action of the player's ship
      (up!
        (lambda (state)
          (set! shooting state)))
@@ -221,10 +285,16 @@
        (lambda (state)
          (set! right state)))
 
+     ;; variables to keep track of which objects
+     ;; can be moved or drawn when the game-loop gets called
+     ;; initialize to big enough values to make sure they're drawn on first try
      (reload-time 0)
      (player-time player-speed)
      (bullet-time bullet-speed)
      (alien-time (aliens 'speed))
+
+     ;; the main loop for the game
+     ;; requires time passed since last call
      (game-loop
        (lambda (delta-t)
          ;; only used with random input activated
@@ -242,13 +312,14 @@
          (when shooting
            (shoot!))
 
-         ;; reloads gun
+         ;; reload gun
          (set! reload-time (+ reload-time delta-t))
          (when (and (not loaded) (> reload-time reload-timer))
            (set! loaded #t)
            (set! reload-time 0))
 
          ;; moves the players ship
+         ;; checks the values of left and right to decide direction
          (set! player-time (+ player-time delta-t))
          (when (> player-time player-speed)
            ((player 'move!) (if left
@@ -261,7 +332,9 @@
          (set! alien-time (+ alien-time delta-t))
          (when (> alien-time (aliens 'speed))
            ((aliens 'move!))
-           (when (<= 100 (random alien-shoot-chance))
+           ; generates a random integer 
+           ; success varies from 0 to 100% depending on alien-shoot-chance
+           (when (> alien-shoot-chance (random 100))
              (let-values (((x y) (aliens 'shoot)))
                ((bullets 'shoot!) 'alien x y)))
            (set! alien-time 0)
@@ -270,8 +343,6 @@
          ;; moves the bullets, and checks for collisions
          (set! bullet-time (+ bullet-time delta-t))
          (when (> bullet-time bullet-speed)
-           ;; gets the bounds of the alien swarm
-           ;; so it doesn't check for collisons when not near it
            ((bullets 'for-each)
             (lambda (b)
               (let* ((x (b 'x))
@@ -280,22 +351,31 @@
                      (target (if (eq? type 'player)
                                aliens
                                player)))
+                ;; gets bounds of target (player or alien swarm)
                 (let-values (((top bottom) (target 'y-bounds))
                              ((left right) (target 'x-bounds)))
                   (when (and (>= y bottom)
                              (<= y top)
                              (>= x left)
                              (<= x right))
+                    ;; a shot returns 2 value
+                    ;; first one is
+                    ;; #f if missed
+                    ;; #t if it hit the player
+                    ;; an integer with points if it hit an alien
+                    ;; second is only #t when the player or last alien died
                     (let-values (((shot game-over) ((target 'shot!) x y)))
-                      ;; shot returns #f when no hits
-                      ;; 0 for hitting but not killing an alien
-                      ;; score to be added for killing an alien
+                      ; shot returns #f when no hits
+                      ; 0 for hitting but not killing an alien
+                      ; score to be added for killing an alien
                       (when shot
                         ((b 'explode!))
                         (when (not (eq? shot 0))
                           ((target 'draw!) window)
                           (when (eq? type 'player)
                             (set! score (+ score shot))))
+                        ; if the bullet caused the end of the game
+                        ; the side that shot it wins
                         (when game-over
                           (displayln (if (eq? type 'player)
                                        "YOU WIN"
@@ -305,6 +385,7 @@
            ((bullets 'draw!))
            (set! bullet-time 0))))
 
+     ;; method for clearing all game objects from the screen
      (clear!
        (window 'clear-game!))
 
@@ -324,23 +405,31 @@
     dispatch))
 
 
+;;; creates a simple menu with 2 options
 (define (menu-adt window)
   (let*
     ((pointer ((window 'pointer-id)))
      (start   ((window 'start-id)))
      (exit    ((window 'exit-id)))
      (menu    ((window 'menu-id)))
+
+     ;; coordinates for menu items
      (pointer-x 1/4)
      (pointer-y 2/5)
      (start-x   1/3)
      (start-y   2/5)
      (exit-x    1/3)
      (exit-y    1/2)
+
+     ;; draw function, draws every item
      (draw!
        (lambda ()
          ((window 'draw!) pointer pointer-x pointer-y)
          ((window 'draw!) start start-x start-y)
          ((window 'draw!) exit exit-x exit-y)))
+
+     ;; functions to interact with the pointer
+     ;; should be switched to something more generic when new items get added
      (up!
        (lambda ()
          (set! pointer-y start-y)))
@@ -352,8 +441,12 @@
          (if (= pointer-y start-y)
            (start-f)
            (exit-f))))
+
+     ;; clears the menu
+     ;; used when starting a game
      (clear!
        (window 'clear-menu!))
+
      (dispatch
        (lambda (msg)
          (case msg
@@ -365,13 +458,21 @@
      dispatch))
 
 
-;;; initialises the game
+;;; main function, creates a window and menu when called
 ;;; optional parameters for window name and random user input
-(define (game-init (name "Main") (random? #f))
+(define (main (name "Main") (random? #f))
   (let*
-    ((window  (window-adt name window-width window-height))
+    ((window  (window-adt name))
+
+     ;; keeps track of the current state (e.g. menu or game)
      (state 'menu)
+
+     ;; creates a menu
      (menu (menu-adt window))
+
+     ;; boolean that changes to #f after user input in menu
+     ;; and #t after a call to draw!
+     ;; avoids unnecessarily redrawing the menu
      (updated #f)
      (updated? (lambda () updated))
      (menu-loop
@@ -380,12 +481,18 @@
            (set! updated #t)
            ((menu 'draw!)))))
 
+     ;; creates a new game
      (game (new-game window random?))
+
+     ;; starts the game by clearing the menu and changing the loop function
      (start
        (lambda ()
          (set! state 'game)
          ((menu 'clear!))
          ((window 'set-game-loop-fun!) (game 'game-loop))))
+
+     ;; stops the game by clearing the screen, changing the loop function
+     ;; also creates a new menu and deletes the old game
      (stop
        (lambda ()
          ((game 'clear!))
@@ -396,21 +503,23 @@
          (set! state 'menu)))
 
      ;; function that processes key press events
+     ;; results depend on current state
      (key-fun
        (lambda (key)
          (if (eq? state 'game)
            (case key
              ((up #\space) ((game 'up!) #t))
-             ((left)    ((game 'left!)  #t))
-             ((right)   ((game 'right!) #t))
-             ((escape)  (stop)))
+             ((left)       ((game 'left!)  #t))
+             ((right)      ((game 'right!) #t))
+             ((escape)     (stop)))
            (case key
-             ((up)   (set! updated #f) ((menu 'up!)))
-             ((down) (set! updated #f) ((menu 'down!)))
-             ((#\return) ((menu 'enter!) start exit))
+             ((up)     (set! updated #f) ((menu 'up!)))
+             ((down)   (set! updated #f) ((menu 'down!)))
+             ((#\space #\return) ((menu 'enter!) start exit))
              ((escape) (exit))))))
 
      ;; function that processes key release events
+     ;; currently only usefull in game mode
      (release-fun
        (lambda (key)
          (when (eq? state 'game)
@@ -419,10 +528,11 @@
              ((left)    ((game 'left!)  #f))
              ((right)   ((game 'right!) #f)))))))
 
-    ((window 'set-game-loop-fun!) menu-loop)
-    ((window 'set-key-fun!)       key-fun)
+    ;; calls these three functions to draw a window with a menu
+    ((window 'set-game-loop-fun!)   menu-loop)
+    ((window 'set-key-fun!)         key-fun)
     ((window 'set-key-release-fun!) release-fun)))
 
 ;; starts game
-(game-init)
+(main)
 
