@@ -239,7 +239,7 @@
              ((5) (set! right #f))))
 
          ;; when shooting, shoot
-         (when loaded
+         (when shooting
            (shoot!))
 
          ;; reloads gun
