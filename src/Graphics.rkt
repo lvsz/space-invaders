@@ -632,12 +632,17 @@
       ((drawable 'set-on-update!) (lambda () #t))
       (set! drawables (remq drawable drawables))
       (redraw))
+
+    (define (clear!)
+      (set! drawables '())
+      (redraw))
     
     ;; # dispatch
     (define (dispatch msg)
       (cond ((eq? msg 'add-drawable)  add-drawable)
             ((eq? msg 'remove-drawable) remove-drawable)
             ((eq? msg 'draw) draw)
+            ((eq? msg 'clear!) clear!)
             (else (raise-arguments-error 'layer
                                          "wrong message sent"
                                          "message"
