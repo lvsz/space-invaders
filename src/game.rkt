@@ -1,8 +1,7 @@
 #lang racket
 
 (require "window.rkt"
-         "aliens.rkt"
-         "ring.rkt")
+         "aliens.rkt")
 
 (provide (all-defined-out))
 
