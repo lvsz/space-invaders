@@ -274,15 +274,12 @@
 
      ;; functions to be called on user input
      ;; changes the values that control the action of the player's ship
-     (up!
-       (lambda (state)
-         (set! shooting state)))
-     (left!
-       (lambda (state)
-         (set! left state)))
-     (right!
-       (lambda (state)
-         (set! right state)))
+     (input!
+       (lambda (key state)
+         (case key
+           ((up #\space) (set! shooting state))
+           ((left) (set! left state))
+           ((right) (set! right state)))))
 
      ;; variables to keep track of which objects
      ;; can be moved or drawn when the game-loop gets called
@@ -392,9 +389,7 @@
        (lambda (msg)
          (case msg
            ((game-loop) game-loop)
-           ((up!)    up!)
-           ((left!)  left!)
-           ((right!) right!)
+           ((input!) input!)
            ((clear!) clear!)
            (else
              (raise-arguments-error
@@ -405,7 +400,7 @@
 
 
 ;;; creates a simple menu with 2 options
-(define (menu-adt window)
+(define (menu-adt window options)
   (let*
     ((pointer ((window 'pointer-id)))
      (start   ((window 'start-id)))
@@ -420,6 +415,11 @@
      (exit-x    1/3)
      (exit-y    1/2)
 
+     (position 0)
+     (position!
+       (lambda (+/-)
+         (set! position (modulo (+/- position 1) (vector-length options)))))
+
      ;; draw function, draws every item
      (draw!
        (lambda ()
@@ -429,17 +429,12 @@
 
      ;; functions to interact with the pointer
      ;; should be switched to something more generic when new items get added
-     (up!
-       (lambda ()
-         (set! pointer-y start-y)))
-     (down!
-       (lambda ()
-         (set! pointer-y exit-y)))
-     (enter!
-       (lambda (start-f exit-f)
-         (if (= pointer-y start-y)
-           (start-f)
-           (exit-f))))
+     (input!
+       (lambda (key)
+         (case key
+           ((up) (position! -) (set! pointer-y start-y))
+           ((down) (position! +) (set! pointer-y exit-y))
+           ((#\return) ((vector-ref options position))))))
 
      ;; clears the menu
      ;; used when starting a game
@@ -450,9 +445,7 @@
        (lambda (msg)
          (case msg
            ((draw!) draw!)
-           ((up!) up!)
-           ((down!) down!)
-           ((enter!) enter!)
+           ((input!) input!)
            ((clear!) clear!)))))
      dispatch))
 
@@ -463,69 +456,58 @@
   (let*
     ((window  (window-adt name))
 
-     ;; keeps track of the current state (e.g. menu or game)
-     (state 'menu)
-
-     ;; creates a menu
-     (menu (menu-adt window))
-
      ;; boolean that changes to #f after user input in menu
      ;; and #t after a call to draw!
      ;; avoids unnecessarily redrawing the menu
      (updated #f)
      (updated? (lambda () updated))
-     (menu-loop
-       (lambda (delta-t)
-         (unless (updated?)
-           (set! updated #t)
-           ((menu 'draw!)))))
+
+     ;; keeps track of the current state (e.g. menu or game)
+     (state 'menu)
 
      ;; creates a new game
-     (game (new-game window random?))
+     (game (new-game window random?)))
+
+      (define (menu-loop delta-t)
+         (unless (updated?)
+           (set! updated #t)
+           ((menu 'draw!))))
 
      ;; starts the game by clearing the menu and changing the loop function
-     (start
-       (lambda ()
+     (define (start)
          (set! state 'game)
          ((menu 'clear!))
-         ((window 'set-game-loop-fun!) (game 'game-loop))))
+         ((window 'set-game-loop-fun!) (game 'game-loop)))
 
      ;; stops the game by clearing the screen, changing the loop function
      ;; also creates a new menu and deletes the old game
-     (stop
-       (lambda ()
+     (define (stop)
          ((game 'clear!))
          ((window 'set-game-loop-fun!) menu-loop)
          (set! updated #f)
-         (set! menu (menu-adt window))
+         (set! menu (menu-adt window (vector start exit)))
          (set! game (new-game window random?))
-         (set! state 'menu)))
+         (set! state 'menu))
+
+     ;; creates a menu
+     (define menu (menu-adt window (vector start exit)))
 
      ;; function that processes key press events
      ;; results depend on current state
-     (key-fun
-       (lambda (key)
+     (define (key-fun key)
          (if (eq? state 'game)
            (case key
-             ((up #\space) ((game 'up!) #t))
-             ((left)       ((game 'left!)  #t))
-             ((right)      ((game 'right!) #t))
-             ((escape)     (stop)))
+             ((escape) (stop))
+             (else ((game 'input!) key #t)))
            (case key
-             ((up)     (set! updated #f) ((menu 'up!)))
-             ((down)   (set! updated #f) ((menu 'down!)))
-             ((#\space #\return) ((menu 'enter!) start exit))
-             ((escape) (exit))))))
+             ((escape) (exit))
+             (else (set! updated #f) ((menu 'input!) key)))))
 
      ;; function that processes key release events
      ;; currently only usefull in game mode
-     (release-fun
-       (lambda (key)
+     (define (release-fun key)
          (when (eq? state 'game)
-           (case key
-             ((up #\space) ((game 'up!) #f))
-             ((left)    ((game 'left!)  #f))
-             ((right)   ((game 'right!) #f)))))))
+           ((game 'input!) key #f)))
 
     ;; calls these three functions to draw a window with a menu
     ((window 'set-game-loop-fun!)   menu-loop)
