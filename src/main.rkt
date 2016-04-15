@@ -1,7 +1,7 @@
 #lang racket
 
 (require "window.rkt"
-         "aliens.rkt")
+         "invaders.rkt")
 
 (provide (all-defined-out))
 
@@ -26,7 +26,7 @@
 ;; requires an integer
 ;; 0 or smaller means 0% chance of a shot
 ;; 100 or larger means 100% chance of a shot
-(define alien-shoot-chance 50)
+(define invader-shoot-chance 50)
 
 ;;; abstract data type for the player's ship
 ;;; id and make-id are objects provided by window.rkt
@@ -107,7 +107,7 @@
 
 
 ;;; bullet adt
-;;; type can either be player or alien
+;;; type can either be player or invader
 ;;; also requires coordinates and id gemerator
 ;;; window is needed to remove the bullet's image after it hit something
 (define (bullet-adt type x y make-id window)
@@ -190,7 +190,7 @@
          (mfor-each proc (mcdr bullets))))
 
      ;; shoot! creates a new bullet and adds it to the structure
-     ;; type can be either player or alien
+     ;; type can be either player or invader
      (shoot!
        (lambda (type x y)
          (mappend! bullets (bullet-adt type x y make-id window))))
@@ -243,7 +243,7 @@
   (let*
     ((player  (player-adt  (window 'player-id)))
      (bullets (bullets-adt (window 'bullet-id) window))
-     (aliens  (swarm-adt   (window 'alien-id)))
+     (invaders  (swarm-adt   (window 'invader-id)))
 
      ;; keeps the score of the current game
      (score 0)
@@ -287,7 +287,7 @@
      (reload-time 0)
      (player-time player-speed)
      (bullet-time bullet-speed)
-     (alien-time (aliens 'speed))
+     (invader-time (invaders 'speed))
 
      ;; the main loop for the game
      ;; requires time passed since last call
@@ -324,17 +324,17 @@
            ((player 'draw!) window)
            (set! player-time 0))
 
-         ;; moves the aliens and controls their bullets
-         (set! alien-time (+ alien-time delta-t))
-         (when (> alien-time (aliens 'speed))
-           ((aliens 'move!))
+         ;; moves the invaders and controls their bullets
+         (set! invader-time (+ invader-time delta-t))
+         (when (> invader-time (invaders 'speed))
+           ((invaders 'move!))
            ; generates a random integer 
-           ; success varies from 0 to 100% depending on alien-shoot-chance
-           (when (> alien-shoot-chance (random 100))
-             (let-values (((x y) (aliens 'shoot)))
-               ((bullets 'shoot!) 'alien x y)))
-           (set! alien-time 0)
-           ((aliens 'draw!) window))
+           ; success varies from 0 to 100% depending on invader-shoot-chance
+           (when (> invader-shoot-chance (random 100))
+             (let-values (((x y) (invaders 'shoot)))
+               ((bullets 'shoot!) 'invader x y)))
+           (set! invader-time 0)
+           ((invaders 'draw!) window))
 
          ;; moves the bullets, and checks for collisions
          (set! bullet-time (+ bullet-time delta-t))
@@ -345,9 +345,9 @@
                      (y (b 'y))
                      (type (b 'type))
                      (target (if (eq? type 'player)
-                               aliens
+                               invaders
                                player)))
-                ;; gets bounds of target (player or alien swarm)
+                ;; gets bounds of target (player or invader swarm)
                 (let-values (((top bottom) (target 'y-bounds))
                              ((left right) (target 'x-bounds)))
                   (when (and (>= y bottom)
@@ -358,12 +358,12 @@
                     ;; first one is
                     ;; #f if missed
                     ;; #t if it hit the player
-                    ;; an integer with points if it hit an alien
-                    ;; second is only #t when the player or last alien died
+                    ;; an integer with points if it hit an invader
+                    ;; second is only #t when the player or last invader died
                     (let-values (((shot game-over) ((target 'shot!) x y)))
                       ; shot returns #f when no hits
-                      ; 0 for hitting but not killing an alien
-                      ; score to be added for killing an alien
+                      ; 0 for hitting but not killing an invader
+                      ; score to be added for killing an invader
                       (when shot
                         ((b 'explode!))
                         (when (not (eq? shot 0))

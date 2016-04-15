@@ -23,7 +23,7 @@
   (let* ((window (make-window width height name))
          (player-layer (window 'make-layer))
          (bullet-layer (window 'make-layer))
-         (alien-layer  (window 'make-layer))
+         (invader-layer  (window 'make-layer))
          (menu-layer   (window 'make-layer))
 
          ;; accessors for ids
@@ -74,9 +74,9 @@
                ((bullet-layer 'add-drawable) tile)
                (cons 'bullet tile))))
 
-         ;; id for an alien
+         ;; id for an invader
          ;; requires an integer to specify what graphic to use
-         (alien-id
+         (invader-id
            (lambda (species-number)
              (let ((tile (if (negative? species-number)
                           (invader-death)
@@ -86,8 +86,8 @@
                             ((2) (invader-B2))
                             ((3) (invader-G2))
                             ((4) (invader-G3))))))
-               ((alien-layer 'add-drawable) tile)
-               (cons 'alien  tile))))
+               ((invader-layer 'add-drawable) tile)
+               (cons 'invader  tile))))
 
          ;; animates bitmap-tiles that support it
          (animate!
@@ -112,7 +112,7 @@
                    (type (type-from-id id)))
                (case type
                  ((menu)   ((menu-layer   'remove-drawable) tile))
-                 ((alien)  ((alien-layer  'remove-drawable) tile))
+                 ((invader)  ((invader-layer  'remove-drawable) tile))
                  ((player) ((player-layer 'remove-drawable) tile))
                  ((bullet) ((bullet-layer 'remove-drawable) tile))))))
 
@@ -140,7 +140,7 @@
            (lambda ()
              ((player-layer 'clear!))
              ((bullet-layer 'clear!))
-             ((alien-layer  'clear!))))
+             ((invader-layer  'clear!))))
 
          (dispatch
            (lambda (msg)
@@ -152,7 +152,7 @@
                ((pointer-id) pointer-id)
                ((start-id)   start-id)
                ((exit-id)    exit-id)
-               ((alien-id)   alien-id)
+               ((invader-id)   invader-id)
                ((player-id)  player-id)
                ((bullet-id)  bullet-id)
                ((set-key-fun!)         set-key-fun!)
