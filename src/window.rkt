@@ -51,7 +51,7 @@
              (let ((tile (make-bitmap-tile "../gfx/start.png")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
-         
+
          ;; id for the menu's exit item
          (exit-id
            (lambda ()

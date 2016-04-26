@@ -73,7 +73,7 @@
      (move!
        (lambda ()
          (set! y (+ y y-move))))
-     
+
      ;; draws and animates the invader
      ;; requires window adt and y coordinate
      (draw!

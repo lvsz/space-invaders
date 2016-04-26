@@ -61,7 +61,7 @@
        (lambda (x y)
          (if (zero? lives)
            ; bullet hit and game over
-           (values #t #t) 
+           (values #t #t)
            ; bullet hit, lost a life, game continues
            (begin
              (set! lives (- lives 1))
@@ -75,7 +75,7 @@
              (left-border 0)
              (right-border (- 1 player-width)))
          (lambda (direction)
-           (cond 
+           (cond
              ; ship isn't touching right border, and it's going right
              ((and (eq? direction 'right) (< x right-border))
               (set! x (+ x difference)))
@@ -328,7 +328,7 @@
          (set! invader-time (+ invader-time delta-t))
          (when (> invader-time (invaders 'speed))
            ((invaders 'move!))
-           ; generates a random integer 
+           ; generates a random integer
            ; success varies from 0 to 100% depending on invader-shoot-chance
            (when (> invader-shoot-chance (random 100))
              (let-values (((x y) (invaders 'shoot)))
@@ -454,7 +454,7 @@
 ;;; optional parameters for window name and random user input
 (define (main (name "Main") (random? #f))
   (let*
-    ((window  (window-adt name))
+    ((window (window-adt name))
 
      ;; boolean that changes to #f after user input in menu
      ;; and #t after a call to draw!
