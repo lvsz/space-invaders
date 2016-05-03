@@ -594,6 +594,7 @@
 (define (make-layer w h canvas)
 
   (let* ((drawables '())                             ;; all drawables on this layer.
+         (hidden #f)
          (bitmap (make-object bitmap% w h #f #t ))    ;; buffer-bitmap for fast drawing
          (bitmap-dc (new bitmap-dc% [bitmap bitmap])) ; dc of bitmap (drawing context)
          (needs-update #t))                           ;; even faster drawing thanks to dirty bit.
@@ -638,12 +639,30 @@
       (set! drawables '())
       (redraw))
 
+    ;; Hides all drawables and redraws the layer
+    (define (hide!)
+      (if hidden
+        (displayln "Warning: layer already hidden")
+        (begin (set! hidden drawables)
+               (set! drawables '())
+               (redraw))))
+
+    ;; Restores hidden drawables and redraws the layer
+    (define (unhide!)
+      (if (not hidden)
+        (displayln "Warning: layer not hidden")
+        (begin (set! drawables hidden)
+               (set! hidden #f)
+               (redraw))))
+
     ;; # dispatch
     (define (dispatch msg)
       (cond ((eq? msg 'add-drawable)  add-drawable)
             ((eq? msg 'remove-drawable) remove-drawable)
             ((eq? msg 'draw) draw)
             ((eq? msg 'clear!) clear!)
+            ((eq? msg 'hide!) hide!)
+            ((eq? msg 'unhide!) unhide!)
             (else (raise-arguments-error 'layer
                                          "wrong message sent"
                                          "message"
