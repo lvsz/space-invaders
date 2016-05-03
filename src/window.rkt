@@ -21,10 +21,10 @@
 ;;; requires a name and optionally non-standard dimensions
 (define (window-adt name (width window-width) (height window-height))
   (let* ((window (make-window width height name))
-         (player-layer (window 'make-layer))
-         (bullet-layer (window 'make-layer))
-         (invader-layer  (window 'make-layer))
-         (menu-layer   (window 'make-layer))
+         (player-layer  (window 'make-layer))
+         (bullet-layer  (window 'make-layer))
+         (invader-layer (window 'make-layer))
+         (menu-layer    (window 'make-layer))
 
          ;; accessors for ids
          (type-from-id car)
@@ -34,43 +34,43 @@
          ;; id for menu background
          (menu-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/menu.png")))
+             (let ((tile (make-tile 224 256 #f #f)))
+               ((tile 'draw-rectangle) 0 0 224 256 "black")
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for menu pointer
          (pointer-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/pointer.png")))
+             (let ((tile (pointer-tile)))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for the menu's start item
          (start-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/start.png")))
+             (let ((tile (start-tile)))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for the menu's exit item
          (exit-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/exit.png")))
+             (let ((tile (exit-tile)))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for the player's ship
          (player-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/player.png"
-                                           "../gfx/player-mask.png")))
+             (let ((tile (player-tile)))
                ((player-layer 'add-drawable) tile)
                (cons 'player tile))))
 
          ;; id for bullets
          (bullet-id
            (lambda ()
-             (let ((tile (make-bitmap-tile "../gfx/bullet.png")))
+             (let ((tile (bullet-tile)))
                ((bullet-layer 'add-drawable) tile)
                (cons 'bullet tile))))
 
@@ -79,13 +79,13 @@
          (invader-id
            (lambda (species-number)
              (let ((tile (if (negative? species-number)
-                          (invader-death)
+                          (explosion-tile)
                           (case (modulo species-number 5)
-                            ((0) (invader-R1))
-                            ((1) (invader-B1))
-                            ((2) (invader-B2))
-                            ((3) (invader-G2))
-                            ((4) (invader-G3))))))
+                            ((0) (invader-1 "magenta"))
+                            ((1) (invader-1 "cyan"))
+                            ((2) (invader-2 "cyan"))
+                            ((3) (invader-2 "green"))
+                            ((4) (invader-3 "green"))))))
                ((invader-layer 'add-drawable) tile)
                (cons 'invader  tile))))
 
@@ -111,10 +111,10 @@
              (let ((tile (tile-from-id id))
                    (type (type-from-id id)))
                (case type
-                 ((menu)   ((menu-layer   'remove-drawable) tile))
-                 ((invader)  ((invader-layer  'remove-drawable) tile))
-                 ((player) ((player-layer 'remove-drawable) tile))
-                 ((bullet) ((bullet-layer 'remove-drawable) tile))))))
+                 ((menu)    ((menu-layer    'remove-drawable) tile))
+                 ((invader) ((invader-layer 'remove-drawable) tile))
+                 ((player)  ((player-layer  'remove-drawable) tile))
+                 ((bullet)  ((bullet-layer  'remove-drawable) tile))))))
 
          ;; sets the main loop function
          (set-game-loop-fun!
@@ -138,9 +138,9 @@
          ;; clears all game layers
          (clear-game!
            (lambda ()
-             ((player-layer 'clear!))
-             ((bullet-layer 'clear!))
-             ((invader-layer  'clear!))))
+             ((player-layer  'clear!))
+             ((bullet-layer  'clear!))
+             ((invader-layer 'clear!))))
 
          (dispatch
            (lambda (msg)
@@ -152,7 +152,7 @@
                ((pointer-id) pointer-id)
                ((start-id)   start-id)
                ((exit-id)    exit-id)
-               ((invader-id)   invader-id)
+               ((invader-id) invader-id)
                ((player-id)  player-id)
                ((bullet-id)  bullet-id)
                ((set-key-fun!)         set-key-fun!)
