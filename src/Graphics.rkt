@@ -318,9 +318,17 @@
       (send bitmap-dc draw-bitmap bitmap 0 0 )
       (update-callback))
 
+    ;; Drawing a point
+    ;; Integer Integer (String OR Color%) -> void
+    (define (draw-point x y color)
+      (when (string? color) (set! color (send the-color-database find-color color)))
+      (send bitmap-dc set-pen color 1 'solid)
+      (send bitmap-dc draw-point x y)
+      (update-callback))
+
     ;; Drawing a rectangle
     ;; Integer Integer Integer Integer (String OR Color%) -> void
-    (define (draw-rectangle x y w h color )
+    (define (draw-rectangle x y w h color)
       (when (string? color) (set! color (send the-color-database find-color color)))
       (send bitmap-dc set-brush color 'solid)
       (send bitmap-dc set-pen color 1 'transparent)
@@ -338,7 +346,7 @@
 
     ;; Drawing a Line
     ;; Integer Integer Integer Integer Integer (String OR Color%) -> void
-    (define (draw-line x y w h width color )
+    (define (draw-line x y w h width color)
       (when (string? color) (set! color (send the-color-database find-color color)))
       (send bitmap-dc set-pen color width 'solid)
       (send bitmap-dc draw-line x y w h)
@@ -436,6 +444,7 @@
         ((eq? msg 'rotate-clockwise) (rotate-clockwise))
         ((eq? msg 'rotate-counterclockwise) (rotate-counterclockwise))
         ((eq? msg 'clear) (clear))
+        ((eq? msg 'draw-point) draw-point)
         ((eq? msg 'draw-rectangle) draw-rectangle)
         ((eq? msg 'draw-ellipse) draw-ellipse)
         ((eq? msg 'draw-line) draw-line)
