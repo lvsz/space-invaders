@@ -2,141 +2,149 @@
 
 (require "Graphics.rkt")
 
-(provide (all-defined-out))
+(provide player-tile
+         bullet-tile
+         invader-a
+         invader-b
+         invader-c
+         explosion-tile
+         exit-tile
+         pointer-tile
+         start-tile)
+
+(define - #f)
+(define X #t)
+(define point? car)
+
+(define player
+    (list - - - - - - X - - - - - -
+          - - - - - X X X - - - - -
+          - - - - - X X X - - - - -
+          - X X X X X X X X X X X -
+          X X X X X X X X X X X X X
+          X X X X X X X X X X X X X
+          X X X X X X X X X X X X X
+          X X X X X X X X X X X X X))
+
+(define bullet
+  (list X
+        X
+        X
+        X
+        X
+        X
+        X))
+
+(define invader-a1
+  (list - - - - X X X X - - - -
+        - X X X X X X X X X X -
+        X X X X X X X X X X X X
+        X X X - - X X - - X X X
+        X X X X X X X X X X X X
+        - - X X X - - X X X - -
+        - X X - - X X - - X X -
+        - - X X - - - - X X - -))
+
+(define invader-a2
+  (list - - - - X X X X - - - -
+        - X X X X X X X X X X -
+        X X X X X X X X X X X X
+        X X X - - X X - - X X X
+        X X X X X X X X X X X X
+        - - - X X - - X X - - -
+        - - X X - X X - X X - -
+        X X - - - - - - - - X X))
+
+(define invader-b1
+  (list - - X - - - - - X - -
+        - - - X - - - X - - -
+        - - X X X X X X X - -
+        - X X - X X X - X X -
+        X X X X X X X X X X X
+        X - X X X X X X X - X
+        X - X - - - - - X - X
+        - - - X X - X X - - -))
+
+(define invader-b2
+  (list - - X - - - - - X - -
+        X - - X - - - X - - X
+        X - X X X X X X X - X
+        X X X - X X X - X X X
+        X X X X X X X X X X X
+        - X X X X X X X X X -
+        - - X - - - - - X - -
+        - X - - - - - - - X -))
+
+(define invader-c1
+  (list - - - X X - - -
+        - - X X X X - -
+        - X X X X X X -
+        X X - X X - X X
+        X X X X X X X X
+        - X - X X - X -
+        X - - - - - - X
+        - X - - - - X -))
+
+(define invader-c2
+  (list - - - X X - - -
+        - - X X X X - -
+        - X X X X X X -
+        X X - X X - X X
+        X X X X X X X X
+        - - X - - X - -
+        - X - X X - X -
+        X - X - - X - X))
+
+
+(define explosion
+  (list - - - - X - - - X - - - -
+        - X - - - X - X - - - X -
+        - - X - - - - - - - X - -
+        - - - X - - - - - X - - -
+        X X - - - - - - - - - X X
+        - - - X - - - - - X - - -
+        - - X - - X - X - - X - -
+        - X - - X - - - X - - X -))
+
+(define (list->tile lst w h color)
+  (let ((tile (make-tile w h #f #f)))
+    (do ((i 0 (+ i 1)) 
+         (bmp lst (cdr bmp)))
+      ((null? bmp) tile)
+     ;; debug code
+     ;; prints ascii representation to stdout
+     ;   (if (point? bmp)
+     ;     (display 'X)
+     ;     (display '-)) 
+     ;   (when (= (modulo (+ i 1) w) 0)
+     ;     (newline))
+      (when (point? bmp)
+        (let-values (((y x) (quotient/remainder i w)))
+          ((tile 'draw-point) x y color))))))
 
 (define (player-tile)
-  (let ((tile (make-tile 26 16 #f #f)))
-    ((tile 'draw-rectangle) 6 0  1 1 "cyan")
-    ((tile 'draw-rectangle) 5 1  3 3 "cyan")
-    ((tile 'draw-rectangle) 1 3 11 1 "cyan")
-    ((tile 'draw-rectangle) 0 4 13 4 "cyan")
-    tile))
+  (list->tile player 13 8 "cyan"))
 
 (define (bullet-tile)
-  (let ((tile (make-tile 2 14 #f #f)))
-    ((tile 'draw-rectangle) 0 0 1 7 "yellow")
-    tile))
+  (list->tile bullet 1 7 "yellow"))
 
-(define (invader-1 color)
-  (let ((tile-1 (make-tile 12 8 #f #f))
-        (tile-2 (make-tile 12 8 #f #f))
-        (base
-          (lambda (tile)
-            ((tile 'draw-rectangle) 4 0  4 1 color)
-            ((tile 'draw-rectangle) 4 0  4 1 color)
-            ((tile 'draw-rectangle) 1 1 10 1 color)
-            ((tile 'draw-rectangle) 0 2 12 1 color)
-            ((tile 'draw-rectangle) 0 3  3 1 color)
-            ((tile 'draw-rectangle) 5 3  2 1 color)
-            ((tile 'draw-rectangle) 9 3  3 1 color)
-            ((tile 'draw-rectangle) 0 4 12 1 color)
-            ((tile 'draw-rectangle) 5 6  2 1 color))))
-    (base tile-1)
-    ((tile-1 'draw-rectangle)  2 5  3 1 color)
-    ((tile-1 'draw-rectangle)  7 5  3 1 color)
-    ((tile-1 'draw-rectangle)  1 6  2 1 color)
-    ((tile-1 'draw-rectangle)  9 6  2 1 color)
-    ((tile-1 'draw-rectangle)  2 7  2 1 color)
-    ((tile-1 'draw-rectangle)  8 7  2 1 color)
-    (base tile-2)
-    ((tile-2 'draw-rectangle)  3 5  2 1 color)
-    ((tile-2 'draw-rectangle)  7 5  2 1 color)
-    ((tile-2 'draw-rectangle)  2 6  2 1 color)
-    ((tile-2 'draw-rectangle)  8 6  2 1 color)
-    ((tile-2 'draw-rectangle)  0 7  2 1 color)
-    ((tile-2 'draw-rectangle) 10 7  2 1 color)
-    (make-tile-sequence
-      (list tile-1 tile-2))))
+(define (invader-a color)
+  (make-tile-sequence
+    (list (list->tile invader-a1 12 8 color)
+          (list->tile invader-a2 12 8 color))))
 
-(define (invader-2 color)
-  (let ((tile-1 (make-tile 11 8 #f #f))
-        (tile-2 (make-tile 11 8 #f #f))
-        (base
-          (lambda (tile)
-            ((tile 'draw-rectangle) 2 0 1 1 color)
-            ((tile 'draw-rectangle) 8 0 1 1 color)
-            ((tile 'draw-rectangle) 3 1 1 1 color)
-            ((tile 'draw-rectangle) 7 1 1 1 color)
-            ((tile 'draw-rectangle) 2 2 7 1 color)
-            ((tile 'draw-rectangle) 1 3 2 1 color)
-            ((tile 'draw-rectangle) 4 3 3 1 color)
-            ((tile 'draw-rectangle) 8 3 2 1 color)
-            ((tile 'draw-rectangle) 1 4 9 1 color)
-            ((tile 'draw-rectangle) 2 6 1 1 color)
-            ((tile 'draw-rectangle) 8 6 1 1 color))))
-    (base tile-1)
-    ((tile-1 'draw-rectangle)  0 4 1 3 color)
-    ((tile-1 'draw-rectangle) 10 4 1 3 color)
-    ((tile-1 'draw-rectangle)  2 5 7 1 color)
-    ((tile-1 'draw-rectangle)  3 7 2 1 color)
-    ((tile-1 'draw-rectangle)  6 7 2 1 color)
-    (base tile-2)
-    ((tile-2 'draw-rectangle)  0 1 1 4 color)
-    ((tile-2 'draw-rectangle) 10 1 1 4 color)
-    ((tile-2 'draw-rectangle)  1 5 9 1 color)
-    ((tile-2 'draw-rectangle)  1 7 1 1 color)
-    ((tile-2 'draw-rectangle)  9 7 1 1 color)
-    (make-tile-sequence
-      (list tile-1 tile-2))))
+(define (invader-b color)
+  (make-tile-sequence
+    (list (list->tile invader-b1 11 8 color)
+          (list->tile invader-b2 11 8 color))))
 
-(define (invader-3 color)
-  (let ((tile-1 (make-tile 10 8 #f #f))
-        (tile-2 (make-tile 10 8 #f #f))
-        (base
-          (lambda (tile)
-            ((tile 'draw-rectangle) 5 0 2 1 color)
-            ((tile 'draw-rectangle) 4 1 4 1 color)
-            ((tile 'draw-rectangle) 3 2 6 1 color)
-            ((tile 'draw-rectangle) 2 3 2 1 color)
-            ((tile 'draw-rectangle) 5 3 2 1 color)
-            ((tile 'draw-rectangle) 8 3 2 1 color)
-            ((tile 'draw-rectangle) 2 4 8 1 color))))
-    (base tile-1)
-    ((tile-1 'draw-rectangle) 3 5 1 1 color)
-    ((tile-1 'draw-rectangle) 5 5 2 1 color)
-    ((tile-1 'draw-rectangle) 8 5 1 1 color)
-    ((tile-1 'draw-rectangle) 2 6 1 1 color)
-    ((tile-1 'draw-rectangle) 9 6 1 1 color)
-    ((tile-1 'draw-rectangle) 3 7 1 1 color)
-    ((tile-1 'draw-rectangle) 8 7 1 1 color)
-    (base tile-2)
-    ((tile-2 'draw-rectangle) 4 5 1 1 color)
-    ((tile-2 'draw-rectangle) 7 5 1 1 color)
-    ((tile-2 'draw-rectangle) 3 6 1 1 color)
-    ((tile-2 'draw-rectangle) 5 6 2 1 color)
-    ((tile-2 'draw-rectangle) 8 6 1 1 color)
-    ((tile-2 'draw-rectangle) 2 7 1 1 color)
-    ((tile-2 'draw-rectangle) 4 7 1 1 color)
-    ((tile-2 'draw-rectangle) 7 7 1 1 color)
-    ((tile-2 'draw-rectangle) 9 7 1 1 color)
-    (make-tile-sequence
-      (list tile-1 tile-2))))
+(define (invader-c color)
+  (make-tile-sequence
+    (list (list->tile invader-c1 8 8 color)
+          (list->tile invader-c2 8 8 color))))
 
 (define (explosion-tile)
-  (let ((tile (make-tile 13 8 #f #f)))
-    ((tile 'draw-rectangle)  4 0 1 1 "white")
-    ((tile 'draw-rectangle)  8 0 1 1 "white")
-    ((tile 'draw-rectangle)  1 1 1 1 "white")
-    ((tile 'draw-rectangle)  5 1 1 1 "white")
-    ((tile 'draw-rectangle)  7 1 1 1 "white")
-    ((tile 'draw-rectangle) 11 1 1 1 "white")
-    ((tile 'draw-rectangle)  2 2 1 1 "white")
-    ((tile 'draw-rectangle) 10 2 1 1 "white")
-    ((tile 'draw-rectangle)  3 3 1 1 "white")
-    ((tile 'draw-rectangle)  9 3 1 1 "white")
-    ((tile 'draw-rectangle)  0 4 2 1 "white")
-    ((tile 'draw-rectangle) 11 4 2 1 "white")
-    ((tile 'draw-rectangle)  3 5 1 1 "white")
-    ((tile 'draw-rectangle)  9 5 1 1 "white")
-    ((tile 'draw-rectangle)  2 6 1 1 "white")
-    ((tile 'draw-rectangle)  5 6 1 1 "white")
-    ((tile 'draw-rectangle)  7 6 1 1 "white")
-    ((tile 'draw-rectangle) 10 6 1 1 "white")
-    ((tile 'draw-rectangle)  1 7 1 1 "white")
-    ((tile 'draw-rectangle)  4 7 1 1 "white")
-    ((tile 'draw-rectangle)  8 7 1 1 "white")
-    ((tile 'draw-rectangle) 11 7 1 1 "white")
-    tile))
+  (list->tile explosion 13 8 "white"))
 
 (define (exit-tile)
   (let ((tile (make-tile 52 12 #f #f)))
@@ -152,3 +160,4 @@
     (let ((tile (make-tile 7 12 #f #f)))
       ((tile 'draw-text) ">" 12 0 0 "white")
       tile))
+
