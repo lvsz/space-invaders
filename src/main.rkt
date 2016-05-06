@@ -257,16 +257,14 @@
      ;; when called, generates a new bullet for the player
      (shoot!
        (lambda ()
-         (when loaded
-           ;; no more shooting till reloaded
-           (set! loaded #f)
-           ;; start coordinates for the bullet
-           ;; x calculates the center of the player's ship
-           (let* ((x (+ (player 'x)
-                        (/ player-width 2)
-                        (- bullet-width)))
-                  (y (player 'y)))
-             ((bullets 'shoot!) 'player x y)))))
+         ;; no more shooting till reloaded
+         ;; start coordinates for the bullet
+         ;; x calculates the center of the player's ship
+         (let* ((x (+ (player 'x)
+                      (/ player-width 2)
+                      (- bullet-width)))
+                (y (player 'y)))
+           ((bullets 'shoot!) 'player x y))))
 
      ;; booleans to indicate player direction
      (left #f)
@@ -304,15 +302,16 @@
              ((4) (set! left #f))
              ((5) (set! right #f))))
 
-         ;; when shooting, shoot
-         (when shooting
-           (shoot!))
-
          ;; reload gun
          (set! reload-time (+ reload-time delta-t))
          (when (and (not loaded) (> reload-time reload-timer))
-           (set! loaded #t)
-           (set! reload-time 0))
+           (set! loaded #t))
+
+         ;; when shooting, shoot
+         (when (and loaded shooting)
+           (set! loaded #f)
+           (set! reload-time 0)
+           (shoot!))
 
          ;; moves the players ship
          ;; checks the values of left and right to decide direction
