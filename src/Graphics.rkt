@@ -643,13 +643,8 @@
       (set! drawables (remq drawable drawables))
       (redraw))
 
-    ;; Clears all drawables and redraws the layer
-    (define (clear!)
-      (set! drawables '())
-      (redraw))
-
     ;; Hides all drawables and redraws the layer
-    (define (hide!)
+    (define (hide)
       (if hidden
         (displayln "Warning: layer already hidden")
         (begin (set! hidden drawables)
@@ -657,21 +652,26 @@
                (redraw))))
 
     ;; Restores hidden drawables and redraws the layer
-    (define (unhide!)
+    (define (unhide)
       (if (not hidden)
         (displayln "Warning: layer not hidden")
         (begin (set! drawables hidden)
                (set! hidden #f)
                (redraw))))
 
+    ;; Clears all drawables and redraws the layer
+    (define (clear!)
+      (set! drawables '())
+      (redraw))
+
     ;; # dispatch
     (define (dispatch msg)
       (cond ((eq? msg 'add-drawable)  add-drawable)
             ((eq? msg 'remove-drawable) remove-drawable)
             ((eq? msg 'draw) draw)
+            ((eq? msg 'hide) hide)
+            ((eq? msg 'unhide) unhide)
             ((eq? msg 'clear!) clear!)
-            ((eq? msg 'hide!) hide!)
-            ((eq? msg 'unhide!) unhide!)
             (else (raise-arguments-error 'layer
                                          "wrong message sent"
                                          "message"

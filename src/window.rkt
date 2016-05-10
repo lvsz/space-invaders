@@ -132,6 +132,22 @@
            (lambda (proc)
              ((window 'set-key-release-callback!) proc)))
 
+         (hide-menu
+           (menu-layer 'hide))
+         (unhide-menu
+           (menu-layer 'unhide))
+
+         (hide-game
+           (lambda ()
+             ((player-layer  'hide))
+             ((bullet-layer  'hide))
+             ((invader-layer 'hide))))
+         (unhide-game
+           (lambda ()
+             ((player-layer  'unhide))
+             ((bullet-layer  'unhide))
+             ((invader-layer 'unhide))))
+
          ;; clears menu layer
          (clear-menu!
            (menu-layer 'clear!))
@@ -159,6 +175,10 @@
                ((set-key-fun!)         set-key-fun!)
                ((set-key-release-fun!) set-key-release-fun!)
                ((set-game-loop-fun!)   set-game-loop-fun!)
+               ((hide-menu)            hide-menu)
+               ((unhide-menu)          unhide-menu)
+               ((hide-game)            hide-game)
+               ((unhide-game)          unhide-game)
                ((clear-game!)          clear-game!)
                ((clear-menu!)          clear-menu!)
                (else

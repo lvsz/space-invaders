@@ -380,6 +380,11 @@
            ((bullets 'draw!))
            (set! bullet-time 0))))
 
+     (hide
+       (window 'hide-game))
+     (unhide
+       (window 'unhide-game))
+
      ;; method for clearing all game objects from the screen
      (clear!
        (window 'clear-game!))
@@ -389,6 +394,8 @@
          (case msg
            ((game-loop) game-loop)
            ((input!) input!)
+           ((hide)  hide)
+           ((unhide) unhide)
            ((clear!) clear!)
            (else
              (raise-arguments-error
@@ -404,7 +411,7 @@
     ((pointer ((window 'pointer-id)))
      (start   ((window 'start-id)))
      (exit    ((window 'exit-id)))
-     (menu    ((window 'menu-id)))
+     ;(menu    ((window 'menu-id)))
 
      ;; coordinates for menu items
      (pointer-x 1/4)
@@ -435,6 +442,11 @@
            ((down) (position! +) (set! pointer-y exit-y))
            ((#\return) ((vector-ref options position))))))
 
+     (hide
+       (window 'hide-menu))
+     (unhide
+       (window 'unhide-menu))
+
      ;; clears the menu
      ;; used when starting a game
      (clear!
@@ -443,8 +455,10 @@
      (dispatch
        (lambda (msg)
          (case msg
-           ((draw!) draw!)
+           ((draw!)  draw!)
            ((input!) input!)
+           ((hide)   hide)
+           ((unhide) unhide)
            ((clear!) clear!)))))
      dispatch))
 
@@ -475,17 +489,17 @@
      ;; starts the game by clearing the menu and changing the loop function
      (define (start)
          (set! state 'game)
-         ((menu 'clear!))
+         ((menu 'hide))
+         ((game 'unhide))
          ((window 'set-game-loop-fun!) (game 'game-loop)))
 
      ;; stops the game by clearing the screen, changing the loop function
      ;; also creates a new menu and deletes the old game
      (define (stop)
-         ((game 'clear!))
          ((window 'set-game-loop-fun!) menu-loop)
          (set! updated #f)
-         (set! menu (menu-adt window (vector start exit)))
-         (set! game (new-game window random?))
+         ((menu 'unhide))
+         ((game 'hide))
          (set! state 'menu))
 
      ;; creates a menu
@@ -509,6 +523,7 @@
            ((game 'input!) key #f)))
 
     ;; calls these three functions to draw a window with a menu
+    ((game 'hide))
     ((window 'set-game-loop-fun!)   menu-loop)
     ((window 'set-key-fun!)         key-fun)
     ((window 'set-key-release-fun!) release-fun)))
