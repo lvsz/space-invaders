@@ -8,13 +8,13 @@
          invader-b
          invader-c
          explosion-tile
-         exit-tile
-         pointer-tile
-         start-tile)
+         text-tile)
 
 (define - #f)
 (define X #t)
 (define point? car)
+(define max-text-size 52)
+(define default-font-size 12)
 
 (define player
     (list - - - - - - X - - - - - -
@@ -28,9 +28,6 @@
 
 (define bullet
   (list X
-        X
-        X
-        X
         X
         X
         X))
@@ -95,7 +92,6 @@
         - X - X X - X -
         X - X - - X - X))
 
-
 (define explosion
   (list - - - - X - - - X - - - -
         - X - - - X - X - - - X -
@@ -105,6 +101,24 @@
         - - - X - - - - - X - - -
         - - X - - X - X - - X - -
         - X - - X - - - X - - X -))
+
+(define barracks
+  (list - - - - X X X X X X X X X X X X X X - - - -
+        - - - X X X X X X X X X X X X X X X X - - -
+        - - X X X X X X X X X X X X X X X X X X - -
+        - X X X X X X X X X X X X X X X X X X X X -
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X X X X X X X X X X X X X X X X
+        X X X X X X X - - - - - - - - X X X X X X X
+        X X X X X X - - - - - - - - - - X X X X X X
+        X X X X X - - - - - - - - - - - - X X X X X
+        X X X X X - - - - - - - - - - - - X X X X X))
 
 (define (list->tile lst w h color)
   (let ((tile (make-tile w h #f #f)))
@@ -146,18 +160,8 @@
 (define (explosion-tile)
   (list->tile explosion 13 8 "white"))
 
-(define (exit-tile)
-  (let ((tile (make-tile 52 12 #f #f)))
-    ((tile 'draw-text) "EXIT" 12 0 0 "white")
+(define (text-tile text (color "white"))
+  (let ((tile (make-tile max-text-size default-font-size #f #f)))
+    ((tile 'draw-text) text 12 0 0 color)
     tile))
-
-  (define (start-tile)
-    (let ((tile (make-tile 52 12 #f #f)))
-      ((tile 'draw-text) "START" 12 0 0 "white")
-      tile))
-
-  (define (pointer-tile)
-    (let ((tile (make-tile 7 12 #f #f)))
-      ((tile 'draw-text) ">" 12 0 0 "white")
-      tile))
 

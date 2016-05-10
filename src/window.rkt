@@ -42,21 +42,21 @@
          ;; id for menu pointer
          (pointer-id
            (lambda ()
-             (let ((tile (pointer-tile)))
+             (let ((tile (text-tile ">")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for the menu's start item
          (start-id
            (lambda ()
-             (let ((tile (start-tile)))
+             (let ((tile (text-tile "START")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
          ;; id for the menu's exit item
          (exit-id
            (lambda ()
-             (let ((tile (exit-tile)))
+             (let ((tile (text-tile "EXIT")))
                ((menu-layer 'add-drawable) tile)
                (cons 'menu tile))))
 
