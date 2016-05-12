@@ -1,7 +1,8 @@
 #lang racket
 
 (require "window.rkt"
-         "invaders.rkt")
+         "invaders.rkt"
+         "bunkers.rkt")
 
 (provide (all-defined-out))
 
@@ -42,7 +43,7 @@
 
      ;; default X and Y positions
      (x (- 1/2 (/ player-width 2)))
-     (y 9/10)
+     (y 19/20)
 
      ;; bounds of the player's hitbox
      ;; gets called for collision checking
@@ -241,9 +242,10 @@
 ;;; can return a game-loop and key functions
 (define (new-game window random?)
   (let*
-    ((player  (player-adt  (window 'player-id)))
-     (bullets (bullets-adt (window 'bullet-id) window))
-     (invaders  (swarm-adt   (window 'invader-id)))
+    ((player   (player-adt  (window 'player-id)))
+     (bullets  (bullets-adt (window 'bullet-id) window))
+     (invaders (swarm-adt   (window 'invader-id)))
+     (bunkers  (bunkers-adt (window 'bunker-id)))
 
      ;; keeps the score of the current game
      (score 0)
@@ -278,6 +280,12 @@
            ((up #\space) (set! shooting state))
            ((left) (set! left state))
            ((right) (set! right state)))))
+
+     (clear-input!
+       (lambda ()
+         (set! shooting #f)
+         (set! left #f)
+         (set! right #f)))
 
      ;; variables to keep track of which objects
      ;; can be moved or drawn when the game-loop gets called
@@ -378,6 +386,7 @@
                           (exit)))))))))
            ((bullets 'move!))
            ((bullets 'draw!))
+           ((bunkers 'draw!) window)
            (set! bullet-time 0))))
 
      (hide
@@ -394,6 +403,7 @@
          (case msg
            ((game-loop) game-loop)
            ((input!) input!)
+           ((clear-input!) clear-input!)
            ((hide)  hide)
            ((unhide) unhide)
            ((clear!) clear!)
@@ -496,10 +506,11 @@
      ;; stops the game by clearing the screen, changing the loop function
      ;; also creates a new menu and deletes the old game
      (define (stop)
+         ((game 'hide))
+         ((game 'clear-input!))
+         ((menu 'unhide))
          ((window 'set-game-loop-fun!) menu-loop)
          (set! updated #f)
-         ((menu 'unhide))
-         ((game 'hide))
          (set! state 'menu))
 
      ;; creates a menu
