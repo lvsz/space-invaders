@@ -112,7 +112,7 @@
     (define frame (new closing-frame%
                        [label title]
                        [width w]
-                       [height (+ h 30)])) ; take border into account
+                       [height (+ h 22)])) ; take border into account
 
     ;; Create the canvas with the custom paint-callback
     ;; This paint-callback is called each time the canvas is refreshed.
