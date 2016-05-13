@@ -4,8 +4,6 @@
          "invaders.rkt"
          "bunkers.rkt")
 
-(provide (all-defined-out))
-
 ;; unit-width and height provided by window.rkt
 (define player-width  (* 13 unit-width))
 (define player-height (*  8 unit-height))
@@ -21,13 +19,13 @@
 (define bullet-speed 15)
 
 ;; time it takes for the player to reload in miliseconds
-(define reload-timer 300)
+(define reload-timer 750)
 
 ;; modifies the rate at which the invaders will shoot after moving
 ;; requires an integer
 ;; 0 or smaller means 0% chance of a shot
 ;; 100 or larger means 100% chance of a shot
-(define invader-shoot-chance 50)
+(define invader-shoot-chance 75)
 
 ;;; abstract data type for the player's ship
 ;;; id and make-id are objects provided by window.rkt
@@ -125,18 +123,16 @@
          (set! active #f)
          ((window 'remove!) id)))
 
-     ;; +/- decides whether the bullet's moving up or down
-     ;; player bullets move up, others down
-     (+/- (if (eq? type 'player) - +))
-
      ;; moves the bullet when active
      (move!
-       (lambda ()
-         (when active
-           (set! y (+/- y bullet-height))
-           ; inactivates the bullet upon hitting the top border
-           (unless (< 0 y 1)
-             (explode!)))))
+       ;; + or - alters direction, which depends on who shot it
+       (let ((+/- (if (eq? type 'player) - +)))
+         (lambda ()
+           (when active
+             (set! y (+/- y (* 2 bullet-height)))
+             ; inactivates the bullet upon hitting the top border
+             (unless (< 0 y 1)
+               (explode!))))))
 
      ;; sends draw message with id and coordinates to window adt
      (draw!
@@ -348,42 +344,46 @@
          (when (> bullet-time bullet-speed)
            ((bullets 'for-each)
             (lambda (b)
-              (let* ((x (b 'x))
-                     (y (b 'y))
-                     (type (b 'type))
-                     (target (if (eq? type 'player)
-                               invaders
-                               player)))
-                ;; gets bounds of target (player or invader swarm)
-                (let-values (((top bottom) (target 'y-bounds))
-                             ((left right) (target 'x-bounds)))
-                  (when (and (>= y bottom)
-                             (<= y top)
-                             (>= x left)
-                             (<= x right))
-                    ;; a shot returns 2 value
-                    ;; first one is
-                    ;; #f if missed
-                    ;; #t if it hit the player
-                    ;; an integer with points if it hit an invader
-                    ;; second is only #t when the player or last invader died
-                    (let-values (((shot game-over) ((target 'shot!) x y)))
-                      ; shot returns #f when no hits
-                      ; 0 for hitting but not killing an invader
-                      ; score to be added for killing an invader
-                      (when shot
-                        ((b 'explode!))
-                        (when (not (eq? shot 0))
-                          ((target 'draw!) window)
-                          (when (eq? type 'player)
-                            (set! score (+ score shot))))
-                        ; if the bullet caused the end of the game
-                        ; the side that shot it wins
-                        (when game-over
-                          (displayln (if (eq? type 'player)
-                                       "YOU WIN"
-                                       "YOU LOSE"))
-                          (exit)))))))))
+              (when (b 'active?)
+                (let* ((x (b 'x))
+                       (y (b 'y))
+                       (type (b 'type))
+                       (target (if (eq? type 'player)
+                                 invaders
+                                 player)))
+                  (if ((bunkers 'shot!) x y (if (eq? type 'player) 'up 'down))
+                    ;; explode if a bunker got hit
+                    ((b 'explode!))
+                    ;; else get bounds of other targets and check for a hit
+                    (let-values (((top bottom) (target 'y-bounds))
+                                 ((left right) (target 'x-bounds)))
+                      (when (and (>= y bottom)
+                                 (<= y top)
+                                 (>= x left)
+                                 (<= x right))
+                        ;; a shot returns 2 value
+                        ;; first one is
+                        ;; #f if missed
+                        ;; #t if it hit the player
+                        ;; an integer with points if it hit an invader
+                        ;; second is only #t when the player or last invader died
+                        (let-values (((shot game-over) ((target 'shot!) x y)))
+                          ; shot returns #f when no hits
+                          ; 0 for hitting but not killing an invader
+                          ; score to be added for killing an invader
+                          (when shot
+                            ((b 'explode!))
+                            (when (not (eq? shot 0))
+                              ((target 'draw!) window)
+                              (when (eq? type 'player)
+                                (set! score (+ score shot))))
+                            ; if the bullet caused the end of the game
+                            ; the side that shot it wins
+                            (when game-over
+                              (displayln (if (eq? type 'player)
+                                           "YOU WIN"
+                                           "YOU LOSE"))
+                              (exit)))))))))))
            ((bullets 'move!))
            ((bullets 'draw!))
            ((bunkers 'draw!) window)
