@@ -167,8 +167,8 @@
     (list (sprite->tile invader-c1 color)
           (sprite->tile invader-c2 color))))
 
-(define (explosion-tile)
-  (sprite->tile explosion "white"))
+(define (explosion-tile color)
+  (sprite->tile explosion color))
 
 (define (bunker-tile bitmap width height)
   (sprite->tile (sprite width height bitmap) "red"))

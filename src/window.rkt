@@ -83,9 +83,12 @@
      ;; id for an invader
      ;; requires an integer to specify what graphic to use
      (invader-id
-       (lambda (species-number)
-         (let ((tile (if (negative? species-number)
-                       (explosion-tile)
+       (lambda (species-number (explosion #f))
+         (let ((tile (if explosion
+                       (case (modulo species-number 5)
+                         ((1 2) (explosion-tile "cyan"))
+                         ((3 4) (explosion-tile "green"))
+                         ((5 0) (explosion-tile "magenta")))
                        (case (modulo species-number 5)
                          ((0) (invader-a "magenta"))
                          ((1) (invader-a "cyan"))

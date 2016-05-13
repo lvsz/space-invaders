@@ -39,9 +39,7 @@
     ;; identifier to store state needed by the window adt
     ((id (make-id type))
 
-     ;; "health bar"
-     ;; varies according to invader type
-     (health (+ (quotient type 2) 1))
+     (health 1)
 
      ;; points upon killing are based on initial health
      (points (+ 100 (* 100 type)))
@@ -88,7 +86,7 @@
            ; draws the explosion and sets health to 0
            ((not exploded)
             ((window 'remove!) id)
-            (set! id (make-id -1))
+            (set! id (make-id type 'explosion))
             ((window 'draw!) id x y)
             (set! exploded #t))
            ; when health is 0, remove explosion graphic
@@ -291,7 +289,7 @@
                                (let ((hit ((column 'shot!) b-y)))
                                  ; true if the column that got hit
                                  ; was most left or right one
-                                 ; and no no longer alive
+                                 ; and no longer alive
                                  (when (and (not (column 'alive?))
                                             (or (= i left) (= i right)))
                                    (cond
