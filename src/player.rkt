@@ -40,13 +40,12 @@
      ;; second one is true if the game ends, false otherwise
      (shot!
        (lambda (x y)
+         (set! lives (- lives 1))
          (if (zero? lives)
            ; bullet hit and game over
            (values #t #t)
            ; bullet hit, lost a life, game continues
-           (begin
-             (set! lives (- lives 1))
-             (values #t #f)))))
+           (values #t #f))))
 
      ;; moves the ship within the window's limits
      ;; only takes the symbols 'left and 'right as arguments
