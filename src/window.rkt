@@ -23,11 +23,14 @@
   (let*
     ((window (make-window width height name))
      (menu-layer     (window 'make-layer))
+     (text-layer     (window 'make-layer))
+     (score-layer    (window 'make-layer))
      (player-layer   (window 'make-layer))
      (bullet-layer   (window 'make-layer))
      (invader-layer  (window 'make-layer))
      (bunker-layer   (window 'make-layer))
-     (game-layers (list player-layer
+     (game-layers (list score-layer
+                        player-layer
                         bullet-layer
                         invader-layer
                         bunker-layer))
@@ -37,11 +40,25 @@
      (tile-from-id cdr)
 
      ;; ids are cons cells with their type and tile
+     ;; id for menu items
      (item-id
        (lambda (name)
          (let ((tile (text-tile (string-replace (symbol->string name) "_" " "))))
            ((menu-layer 'add-drawable) tile)
            (cons 'menu tile))))
+
+     ;; id for text (like the end screen)
+     (text-id
+       (lambda (text)
+         (let ((tile (text-tile text)))
+           ((text-layer 'add-drawable) tile)
+           (cons 'text tile))))
+
+     (score-id
+       (lambda (text)
+         (let ((tile (score-tile text)))
+           ((score-layer 'add-drawable) tile)
+           (cons 'score tile))))
 
      ;; id for the player's ship
      (player-id
@@ -59,6 +76,7 @@
 
      ;; id for an invader
      ;; requires an integer to specify what graphic to use
+     ;; an optional second parameter will generate suitable explosion
      (invader-id
        (lambda (species-number (explosion #f))
          (let ((tile (if explosion
@@ -106,6 +124,7 @@
            (case type
              ((menu)    ((menu-layer    'remove-drawable) tile))
              ((invader) ((invader-layer 'remove-drawable) tile))
+             ((score)   ((score-layer   'remove-drawable) tile))
              ((player)  ((player-layer  'remove-drawable) tile))
              ((bullet)  ((bullet-layer  'remove-drawable) tile))
              ((bunker)  ((bunker-layer  'remove-drawable) tile))))))
@@ -150,6 +169,9 @@
      (clear-menu!
        (menu-layer 'clear!))
 
+     (clear-text!
+       (text-layer 'clear!))
+
      ;; clears all game layers
      (clear-game!
        (lambda ()
@@ -163,6 +185,8 @@
            ((animate!)   animate!)
            ((scale!)     scale!)
            ((item-id)    item-id)
+           ((text-id)    text-id)
+           ((score-id)   score-id)
            ((invader-id) invader-id)
            ((player-id)  player-id)
            ((bullet-id)  bullet-id)
@@ -174,8 +198,9 @@
            ((unhide-menu)          unhide-menu)
            ((hide-game)            hide-game)
            ((unhide-game)          unhide-game)
-           ((clear-game!)          clear-game!)
            ((clear-menu!)          clear-menu!)
+           ((clear-text!)          clear-text!)
+           ((clear-game!)          clear-game!)
            (else
              (raise-arguments-error 'window-adt
                                     "invalid argument"

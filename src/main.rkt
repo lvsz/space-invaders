@@ -21,7 +21,7 @@
 
 ;;; generates everything needed to start a new game
 ;;; can return a game-loop and key functions
-(define (new-game window random?)
+(define (new-game window on-finish random?)
   (let*
     ((player   (player-adt  (window 'player-id)))
      (bullets  (bullets-adt (window 'bullet-id)))
@@ -30,6 +30,7 @@
 
      ;; keeps the score of the current game
      (score 0)
+     (score-id ((window 'score-id) "SCORE: 0"))
 
      ;; boolean that tells if the shoot! key is being pressed
      (shooting #f)
@@ -62,11 +63,25 @@
            ((left) (set! left state))
            ((right) (set! right state)))))
 
+     ;; clear input variables
+     ;; useful when pausing the game
      (clear-input!
        (lambda ()
          (set! shooting #f)
          (set! left #f)
          (set! right #f)))
+
+     ;; hide or unhide the game
+     (hide
+       (lambda ()
+         (clear-input!)
+         ((window 'hide-game))))
+     (unhide
+       (window 'unhide-game))
+
+     ;; method for clearing all game objects from the screen
+     (clear!
+       (window 'clear-game!))
 
      ;; variables to keep track of which objects
      ;; can be moved or drawn when the game-loop gets called
@@ -146,7 +161,7 @@
                                  (<= y top)
                                  (>= x left)
                                  (<= x right))
-                        ;; a shot returns 2 value
+                        ;; a shot returns 2 values
                         ;; first one is
                         ;; #f if missed
                         ;; #t if it hit the player
@@ -161,34 +176,26 @@
                             (when (not (eq? shot 0))
                               ((target 'draw!) window)
                               (when (eq? type 'player)
-                                (set! score (+ score shot))))
+                                (set! score (+ score shot))
+                                ((window 'remove!) score-id)
+                                (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
+                                ((window 'draw!) score-id 0 0)))
                             ; if the bullet caused the end of the game
                             ; the side that shot it wins
                             (when game-over
-                              (displayln (if (eq? type 'player)
-                                           "YOU WIN"
-                                           "YOU LOSE"))
-                              (exit)))))))))))
+                              (if (eq? type 'player)
+                                (on-finish score #t)
+                                (on-finish score #f))))))))))))
            ((bullets 'move!))
            ((bullets 'draw!) window)
            ((bunkers 'draw!) window)
            (set! bullet-time 0))))
-
-     (hide
-       (window 'hide-game))
-     (unhide
-       (window 'unhide-game))
-
-     ;; method for clearing all game objects from the screen
-     (clear!
-       (window 'clear-game!))
 
      (dispatch
        (lambda (msg)
          (case msg
            ((game-loop) game-loop)
            ((input!) input!)
-           ((clear-input!) clear-input!)
            ((hide)  hide)
            ((unhide) unhide)
            ((clear!) clear!)
@@ -274,10 +281,7 @@
      (first-pause #t)
 
      ;; keeps track of the current state (e.g. menu or game)
-     (state 'menu)
-
-     ;; creates a new game
-     (game (new-game window random?)))
+     (state 'menu))
 
     (define (menu-loop delta-t)
       (unless (updated?)
@@ -298,15 +302,14 @@
     ;; also creates a new menu and deletes the old game
     (define (stop)
       ((game 'hide))
-      ((game 'clear-input!))
       ((menu 'unhide))
       (when first-pause
       ((menu 'clear!))
         (set! first-pause #f)
         (set! menu (menu-adt window
                              (item 'CONTINUE continue)
-                             (item 'EXIT  exit)
-                             (item 'ZOOM_IN zoom-in)
+                             (item 'EXIT     exit)
+                             (item 'ZOOM_IN  zoom-in)
                              (item 'ZOOM_OUT zoom-out))))
       ((window 'set-game-loop-fun!) menu-loop)
       (set! updated #f)
@@ -325,17 +328,49 @@
                            (item 'ZOOM_IN zoom-in)
                            (item 'ZOOM_OUT zoom-out)))
 
+    ;; what happens when the game's over
+    (define (on-finish score victory?)
+      ((game 'clear!))
+      ((menu 'unhide))
+      ((menu 'clear!))
+      ((window 'set-game-loop-fun!) menu-loop)
+      (set! state 'finish)
+      (let ((text-id  ((window 'text-id) (if victory? "VICTORY" "YOU LOSE")))
+            (score-id ((window 'text-id) (format "SCORE: ~a" score))))
+          ((window 'draw!) text-id  1/4 2/5)
+          ((window 'draw!) score-id 1/4 1/2)))
+
+    ;; creates a new game
+    (define game
+      (new-game window on-finish random?))
+
+    (define (restart)
+      ((window 'clear-text!))
+      (set! state 'menu)
+      (set! updated #f)
+      (set! first-pause #t)
+      (set! menu (menu-adt window
+                           (item 'START start)
+                           (item 'EXIT  exit)
+                           (item 'ZOOM_IN zoom-in)
+                           (item 'ZOOM_OUT zoom-out)))
+      (set! game (new-game window on-finish random?))
+      ((game 'hide)))
 
     ;; function that processes key press events
     ;; results depend on current state
     (define (key-fun key)
-      (if (eq? state 'game)
-        (case key
-          ((escape) (stop))
-          (else ((game 'input!) key #t)))
-        (case key
-          ((escape) (exit))
-          (else (set! updated #f) ((menu 'input!) key)))))
+      (case state
+        ((game) (case key
+                  ((escape) (stop))
+                  (else ((game 'input!) key #t))))
+        ((menu) (case key
+                  ((escape) (exit))
+                  ((up down #\return)
+                   (set! updated #f)
+                   ((menu 'input!) key))))
+        ((finish) (case key
+                    ((escape #\return) (restart))))))
 
     ;; function that processes key release events
     ;; currently only usefull in game mode

@@ -42,7 +42,7 @@
      (health 1)
 
      ;; points upon killing are based on initial health
-     (points (+ 100 (* 100 type)))
+     (points (+ 10 (* 10 (quotient type 2))))
 
      ;; is it alive?
      (alive?
@@ -121,7 +121,7 @@
        (build-vector
          invaders/column
          (lambda (i)
-           (invader-adt (* i vertical-spacing) make-id (- invaders/column i 1)))))
+           (invader-adt (+ y (* i vertical-spacing)) make-id (- invaders/column i 1)))))
 
     ;; number of invaders alive, 0 means column is empty
     (alive invaders/column)
@@ -221,7 +221,7 @@
 ;;; swarm-adt is a row of invader-columns
 (define (swarm-adt make-id)
   (let* ((x 0)
-         (y 0)
+         (y 1/7)
 
          (game-over #f)
 
