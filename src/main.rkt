@@ -24,7 +24,7 @@
 (define (new-game window random?)
   (let*
     ((player   (player-adt  (window 'player-id)))
-     (bullets  (bullets-adt (window 'bullet-id) window))
+     (bullets  (bullets-adt (window 'bullet-id)))
      (invaders (swarm-adt   (window 'invader-id)))
      (bunkers  (bunkers-adt (window 'bunker-id)))
 
@@ -170,7 +170,7 @@
                                            "YOU LOSE"))
                               (exit)))))))))))
            ((bullets 'move!))
-           ((bullets 'draw!))
+           ((bullets 'draw!) window)
            ((bunkers 'draw!) window)
            (set! bullet-time 0))))
 

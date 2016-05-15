@@ -12,21 +12,22 @@
 ;;; bullet adt
 ;;; type can either be player or invader
 ;;; also requires coordinates and id gemerator
-;;; window is needed to remove the bullet's image after it hit something
-(define (bullet-adt type x y make-id window)
+(define (bullet-adt type x y make-id)
   (let*
     ((id (make-id))
 
      ;; when true, the bullet moves and gets drawn
      ;; when false, the data structure it's located in can safely delete it
      (active #t)
+     (exploded #f)
 
      ;; makes it inactive and removes it from the window
      (explode!
        (lambda ()
-         (set! active #f)
-         ((window 'remove!) id)))
+         (set! exploded #t)))
 
+     ;; calculates the needed movements
+     ;; based on who shot it
      (move
        (if (eq? type 'player)
          (lambda (y)
@@ -45,8 +46,12 @@
 
      ;; sends draw message with id and coordinates to window adt
      (draw!
-       (lambda ()
-         ((window 'draw!) id x y)))
+       (lambda (window)
+         (when active
+           (if exploded
+             (begin (set! active #f)
+                    ((window 'remove!) id))
+             ((window 'draw!) id x y)))))
 
      (dispatch
        (lambda (msg)
@@ -84,8 +89,7 @@
 
 ;;; the bullets adt is a data structure that holds and modifies every bullet
 ;;; the make-id function is needed to generate new bullets
-;;; window is needed to clear their graphics
-(define (bullets-adt make-id window)
+(define (bullets-adt make-id)
   (let*
     (;; starts by making a headed mutable list
      (bullets (mcons 'bullets '()))
@@ -99,7 +103,7 @@
      ;; type can be either player or invader
      (shoot!
        (lambda (type x y)
-         (mappend! bullets (bullet-adt type x y make-id window))))
+         (mappend! bullets (bullet-adt type x y make-id))))
 
      ;; goes through all bullets till it finds an active one
      ;; the ones before get removed from the list
@@ -125,8 +129,8 @@
 
      ;; draws! all bullets
      (draw!
-       (lambda ()
-         (bullet-for-each (lambda (b) ((b 'draw!))))))
+       (lambda (window)
+         (bullet-for-each (lambda (b) ((b 'draw!) window)))))
 
      (dispatch
        (lambda (msg)
