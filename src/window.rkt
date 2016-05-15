@@ -43,7 +43,9 @@
      ;; id for menu items
      (item-id
        (lambda (name)
-         (let ((tile (text-tile (string-replace (symbol->string name) "_" " "))))
+         (let ((tile (text-tile (if (string? name)
+                                  name
+                                  (string-replace (symbol->string name) "_" " ")))))
            ((menu-layer 'add-drawable) tile)
            (cons 'menu tile))))
 

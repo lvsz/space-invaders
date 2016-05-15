@@ -194,11 +194,12 @@
      (dispatch
        (lambda (msg)
          (case msg
-           ((game-loop) game-loop)
+           ((score)  score)
            ((input!) input!)
-           ((hide)  hide)
+           ((hide)   hide)
            ((unhide) unhide)
            ((clear!) clear!)
+           ((game-loop) game-loop)
            (else
              (raise-arguments-error
                'game-loop
@@ -211,10 +212,10 @@
 (struct item (name proc))
 
 ;;; creates a simple menu with 2 options
-(define (menu-adt window . items)
+(define (menu-adt window hi-score . items)
   (let*
-    ((pointer (item  '> void))
-     (pointer-id ((window 'item-id) (item-name pointer)))
+    ((pointer-id ((window 'item-id) '>))
+     (hi-score-id ((window 'item-id) (format "HI-SCORE: ~a" hi-score)))
      (items (list->vector items))
      (ids (vector-map (lambda (item) ((window 'item-id) (item-name item))) items))
      (number-of-items (vector-length items))
@@ -229,6 +230,7 @@
      ;; draw function, draws every item
      (draw!
        (lambda ()
+         ((window 'draw!) hi-score-id 0 0)
          (do ((i 0   (+ i 1))
               (y 1/4 (+ y 1/12)))
            ((= i number-of-items) (void))
@@ -281,7 +283,9 @@
      (first-pause #t)
 
      ;; keeps track of the current state (e.g. menu or game)
-     (state 'menu))
+     (state 'menu)
+     
+     (hi-score 0))
 
     (define (menu-loop delta-t)
       (unless (updated?)
@@ -307,6 +311,7 @@
       ((menu 'clear!))
         (set! first-pause #f)
         (set! menu (menu-adt window
+                             hi-score
                              (item 'CONTINUE continue)
                              (item 'EXIT     exit)
                              (item 'ZOOM_IN  zoom-in)
@@ -323,6 +328,7 @@
 
     ;; creates a menu
     (define menu (menu-adt window
+                           hi-score
                            (item 'START start)
                            (item 'EXIT  exit)
                            (item 'ZOOM_IN zoom-in)
@@ -330,6 +336,8 @@
 
     ;; what happens when the game's over
     (define (on-finish score victory?)
+      (when (> score hi-score)
+        (set! hi-score score))
       ((game 'clear!))
       ((menu 'unhide))
       ((menu 'clear!))
@@ -350,6 +358,7 @@
       (set! updated #f)
       (set! first-pause #t)
       (set! menu (menu-adt window
+                           hi-score
                            (item 'START start)
                            (item 'EXIT  exit)
                            (item 'ZOOM_IN zoom-in)
