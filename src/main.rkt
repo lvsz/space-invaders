@@ -1,243 +1,23 @@
 #lang racket
 
 (require "window.rkt"
+	     "player.rkt"
+		 "bullets.rkt"
          "invaders.rkt"
          "bunkers.rkt")
-
-;; unit-width and height provided by window.rkt
-(define player-width  (* 13 unit-width))
-(define player-height (*  8 unit-height))
-(define bullet-width  (*  1 unit-width))
-(define bullet-height (*  3 unit-height))
-(define menu-item-width  (* 52 unit-width))
-(define menu-item-height (* 12 unit-height))
-(define pointer-width    (* 7 unit-width))
-(define pointer-height   menu-item-height)
 
 ;; time between updates in miliseconds
 (define player-speed 30)
 (define bullet-speed 15)
 
 ;; time it takes for the player to reload in miliseconds
-(define reload-timer 750)
+(define reload-timer 600)
 
 ;; modifies the rate at which the invaders will shoot after moving
 ;; requires an integer
 ;; 0 or smaller means 0% chance of a shot
 ;; 100 or larger means 100% chance of a shot
 (define invader-shoot-chance 75)
-
-;;; abstract data type for the player's ship
-;;; id and make-id are objects provided by window.rkt
-;;; they are used to generate and save a unique identifier
-;;; and graphical representation for every instantiation
-(define (player-adt make-id)
-  (let*
-    ((id (make-id))
-
-     ;; player lives
-     ;; game over when hit with 0 left
-     (lives 3)
-
-     ;; default X and Y positions
-     (x (- 1/2 (/ player-width 2)))
-     (y 19/20)
-
-     ;; bounds of the player's hitbox
-     ;; gets called for collision checking
-     (x-bounds
-       (lambda ()
-         (values x (+ x player-width))))
-     (y-bounds
-       (lambda ()
-         (values (+ y player-height) y)))
-
-     ;; gets called when hit by a bullet
-     ;; returns 2 values
-     ;; first one if it hit (currently can't return false)
-     ;; second one is true if the game ends, false otherwise
-     (shot!
-       (lambda (x y)
-         (if (zero? lives)
-           ; bullet hit and game over
-           (values #t #t)
-           ; bullet hit, lost a life, game continues
-           (begin
-             (set! lives (- lives 1))
-             (values #t #f)))))
-
-     ;; moves the ship within the window's limits
-     ;; only takes the symbols 'left and 'right as arguments
-     ;; others get ignored
-     (move!
-       (let ((difference (* 2 unit-width))
-             (left-border 0)
-             (right-border (- 1 player-width)))
-         (lambda (direction)
-           (cond
-             ; ship isn't touching right border, and it's going right
-             ((and (eq? direction 'right) (< x right-border))
-              (set! x (+ x difference)))
-             ; ship isn't touching left border, and it's going left
-             ((and (eq? direction 'left) (> x left-border))
-              (set! x (- x difference)))))))
-
-     ;; sends draw message with id and coordinates to window adt
-     (draw!
-       (lambda (window)
-         ((window 'draw!) id x y)))
-
-     (dispatch
-       (lambda (msg)
-         (case msg
-           ((x) x)
-           ((y) y)
-           ((x-bounds) (x-bounds))
-           ((y-bounds) (y-bounds))
-           ((shot!)      shot!)
-           ((move!)      move!)
-           ((draw!)      draw!)
-           (else
-             (raise-arguments-error
-               'player-adt
-               "invalid argument"
-               "given" msg))))))
-    dispatch))
-
-
-;;; bullet adt
-;;; type can either be player or invader
-;;; also requires coordinates and id gemerator
-;;; window is needed to remove the bullet's image after it hit something
-(define (bullet-adt type x y make-id window)
-  (let*
-    ((id (make-id))
-
-     ;; when true, the bullet moves and gets drawn
-     ;; when false, the data structure it's located in can safely delete it
-     (active #t)
-
-     ;; makes it inactive and removes it from the window
-     (explode!
-       (lambda ()
-         (set! active #f)
-         ((window 'remove!) id)))
-
-     (move
-       (if (eq? type 'player)
-         (lambda (y)
-           (- y (* 2 bullet-height)))
-         (lambda (y)
-           (+ y (* 3/2 bullet-height)))))
-
-     ;; moves the bullet when active
-     (move!
-       (lambda ()
-         (when active
-           (set! y (move y))
-           ; inactivates the bullet upon hitting the top border
-           (unless (< 0 y 1)
-             (explode!)))))
-
-     ;; sends draw message with id and coordinates to window adt
-     (draw!
-       (lambda ()
-         ((window 'draw!) id x y)))
-
-     (dispatch
-       (lambda (msg)
-         (case msg
-           ((x) x)
-           ((y) y)
-           ((type)      type)
-           ((active?)   active)
-           ((explode!)  explode!)
-           ((move!)     move!)
-           ((draw!)     draw!)
-           (else
-             (raise-arguments-error
-               'bullet-adt
-               "invalid argument"
-               "given" msg))))))
-    dispatch))
-
-
-;;; some helper functions for the bullets-adt, which relies on mutable lists
-;;; may get moved to a seperate module because they're generic
-
-;; for-each function for mutable lists
-(define (mfor-each proc . mlists)
-  (when (and (pair? mlists) (andmap mpair? mlists))
-    (apply proc (map mcar mlists))
-    (apply mfor-each proc (map mcdr mlists))))
-
-;; destructive append for mutable lists
-(define (mappend! mlist element)
-  (if (null? (mcdr mlist))
-    (set-mcdr! mlist (mcons element '()))
-    (mappend! (mcdr mlist) element)))
-
-
-;;; the bullets adt is a data structure that holds and modifies every bullet
-;;; the make-id function is needed to generate new bullets
-;;; window is needed to clear their graphics
-(define (bullets-adt make-id window)
-  (let*
-    (;; starts by making a headed mutable list
-     (bullets (mcons 'bullets '()))
-
-     ;; a for-each function that only needs a procedure
-     (bullet-for-each
-       (lambda (proc)
-         (mfor-each proc (mcdr bullets))))
-
-     ;; shoot! creates a new bullet and adds it to the structure
-     ;; type can be either player or invader
-     (shoot!
-       (lambda (type x y)
-         (mappend! bullets (bullet-adt type x y make-id window))))
-
-     ;; goes through all bullets till it finds an active one
-     ;; the ones before get removed from the list
-     (clean-up!
-       (lambda ()
-         (let loop ((active-bullets (mcdr bullets)))
-           (cond
-             ((null? active-bullets)
-              (set-mcdr! bullets '()))
-             (((mcar active-bullets) 'active?)
-              (set-mcdr! bullets active-bullets))
-             (else
-              (loop (mcdr active-bullets)))))))
-
-     ;; move! first tries to clean up any inactive bullets
-     ;; then calls move! on the remaining one
-     (move!
-       (lambda ()
-         ; make sure there are any bullets to move
-         (when (mpair? (mcdr bullets))
-           (clean-up!)
-           (bullet-for-each (lambda (b) ((b 'move!)))))))
-
-     ;; draws! all bullets
-     (draw!
-       (lambda ()
-         (bullet-for-each (lambda (b) ((b 'draw!))))))
-
-     (dispatch
-       (lambda (msg)
-         (case msg
-           ((for-each) bullet-for-each)
-           ((shoot!)   shoot!)
-           ((move!)    move!)
-           ((draw!)    draw!)
-           (else
-             (raise-arguments-error
-               'bullets-adt
-               "invalid argument"
-               "given" msg))))))
-    dispatch))
-
 
 ;;; generates everything needed to start a new game
 ;;; can return a game-loop and key functions
@@ -419,7 +199,8 @@
                "given" msg))))))
     dispatch))
 
-
+	
+;; simple struct to store menu-items
 (struct item (name proc))
 
 ;;; creates a simple menu with 2 options
