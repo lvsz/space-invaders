@@ -171,17 +171,14 @@
                         ;; second is only #t when the player or last invader died
                         (let-values (((shot game-over) ((target 'shot!) x y)))
                           ; shot returns #f when no hits
-                          ; 0 for hitting but not killing an invader
                           ; score to be added for killing an invader
                           (when shot
                             ((b 'explode!))
-                            (when (not (eq? shot 0))
-                              ((target 'draw!) window)
-                              (when (eq? type 'player)
-                                (set! score (+ score shot))
-                                ((window 'remove!) score-id)
-                                (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
-                                ((window 'draw!) score-id 0 0)))
+                            (when (eq? type 'player)
+                              (set! score (+ score shot))
+                              ((window 'remove!) score-id)
+                              (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
+                              ((window 'draw!) score-id 0 0))
                             ; if the bullet caused the end of the game
                             ; the side that shot it wins
                             (when game-over
@@ -196,7 +193,6 @@
      (dispatch
        (lambda (msg)
          (case msg
-           ((score)  score)
            ((input!) input!)
            ((hide)   hide)
            ((unhide) unhide)
