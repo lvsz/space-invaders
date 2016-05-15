@@ -6,6 +6,8 @@
          "invaders.rkt"
          "bunkers.rkt")
 
+(define hi-score-file "../Resources/hi-score")
+
 ;; time between updates in miliseconds
 (define player-speed 30)
 (define bullet-speed 15)
@@ -285,7 +287,10 @@
      ;; keeps track of the current state (e.g. menu or game)
      (state 'menu)
      
-     (hi-score 0))
+     (hi-score 
+       (if (file-exists? hi-score-file)
+         (call-with-input-file hi-score-file (lambda (in) (read in)))
+         0)))
 
     (define (menu-loop delta-t)
       (unless (updated?)
@@ -337,7 +342,13 @@
     ;; what happens when the game's over
     (define (on-finish score victory?)
       (when (> score hi-score)
-        (set! hi-score score))
+        (set! hi-score score)
+        (unless (directory-exists? "../Resources")
+          (make-directory "../Resources"))
+        (call-with-output-file hi-score-file
+                               (lambda (out) (write score out))
+                               #:mode 'text
+                               #:exists 'replace))
       ((game 'clear!))
       ((menu 'unhide))
       ((menu 'clear!))
@@ -387,7 +398,7 @@
       (when (eq? state 'game)
         ((game 'input!) key #f)))
 
-    ;; calls these three functions to draw a window with a menu
+    ;; calls these functions to start
     ((game 'hide))
     ((window 'set-game-loop-fun!)   menu-loop)
     ((window 'set-key-fun!)         key-fun)
