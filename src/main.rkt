@@ -435,7 +435,7 @@
      (position!
        (lambda (direction)
          (set! position
-           (modulo (+ position (if (eq? direction 'up) 1 -1))
+           (modulo (+ position (if (eq? direction 'up) -1 1))
                    number-of-items))))
 
      ;; draw function, draws every item
@@ -482,7 +482,6 @@
 (define (main (name "Main") (random? #f))
   (let*
     ((window (window-adt name))
-     (scale 1)
 
      ;; boolean that changes to #f after user input in menu
      ;; and #t after a call to draw!
@@ -518,9 +517,17 @@
          (set! updated #f)
          (set! state 'menu))
 
+     ;; functions that resize the window
+     (define (zoom-in)
+       ((window 'scale!) +))
+     (define (zoom-out)
+       ((window 'scale!) -))
+
      ;; creates a menu
      (define menu (menu-adt window (item 'START start)
-                                   (item 'EXIT  exit)))
+                                   (item 'EXIT  exit)
+                                   (item 'ZOOM_IN zoom-in)
+                                   (item 'ZOOM_OUT zoom-out)))
 
      ;; function that processes key press events
      ;; results depend on current state

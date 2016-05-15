@@ -173,6 +173,17 @@
                    [interval (calculate-interval) ]
                    [just-once? #t]))))
 
+    ;; scales the window with a valid fractional
+    ;; can't figure out how to resize the window after zooming out though
+    (define (set-scale n)
+      (let* ((new-w (* w n))
+             (new-h (* h n)))
+        (send frame min-width new-w)
+        (send frame min-height new-h)
+        (set! buffer-bitmap (make-object bitmap% new-w new-h))
+        (send buffer-bitmap-dc set-bitmap buffer-bitmap)
+        (send buffer-bitmap-dc set-scale n n)))
+
     ;; dispatch
     (define (dispatch msg)
       (cond ((eq? msg 'make-layer) (add-layer))
@@ -180,6 +191,7 @@
             ((eq? msg 'set-key-callback!) (lambda (eh) (set! keyboard-callback eh)))
             ((eq? msg 'set-update-callback!) (lambda (gl) (set! update-callback gl)))
             ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
+            ((eq? msg 'set-scale) set-scale)
             (else (raise-arguments-error 'window
                                          "wrong message sent"
                                          "message"

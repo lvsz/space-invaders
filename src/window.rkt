@@ -39,7 +39,7 @@
      ;; ids are cons cells with their type and tile
      (item-id
        (lambda (name)
-         (let ((tile (text-tile (symbol->string name))))
+         (let ((tile (text-tile (string-replace (symbol->string name) "_" " "))))
            ((menu-layer 'add-drawable) tile)
            (cons 'menu tile))))
 
@@ -110,6 +110,15 @@
              ((bullet)  ((bullet-layer  'remove-drawable) tile))
              ((bunker)  ((bunker-layer  'remove-drawable) tile))))))
 
+     ;; scales the window by 50% of its original size
+     (scale!
+       (let ((scale 1))
+         (lambda (+/-)
+           (let ((new-scale (+/- scale 1/2)))
+             (when (positive? new-scale)
+               (set! scale new-scale)
+               ((window 'set-scale) scale))))))
+
      ;; sets the main loop function
      (set-game-loop-fun!
        (lambda (proc)
@@ -152,6 +161,7 @@
            ((draw!)      draw!)
            ((remove!)    remove!)
            ((animate!)   animate!)
+           ((scale!)     scale!)
            ((item-id)    item-id)
            ((invader-id) invader-id)
            ((player-id)  player-id)
