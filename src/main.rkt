@@ -123,16 +123,21 @@
          (set! active #f)
          ((window 'remove!) id)))
 
+     (move
+       (if (eq? type 'player)
+         (lambda (y)
+           (- y (* 2 bullet-height)))
+         (lambda (y)
+           (+ y (* 3/2 bullet-height)))))
+
      ;; moves the bullet when active
      (move!
-       ;; + or - alters direction, which depends on who shot it
-       (let ((+/- (if (eq? type 'player) - +)))
-         (lambda ()
-           (when active
-             (set! y (+/- y (* 2 bullet-height)))
-             ; inactivates the bullet upon hitting the top border
-             (unless (< 0 y 1)
-               (explode!))))))
+       (lambda ()
+         (when active
+           (set! y (move y))
+           ; inactivates the bullet upon hitting the top border
+           (unless (< 0 y 1)
+             (explode!)))))
 
      ;; sends draw message with id and coordinates to window adt
      (draw!
@@ -415,42 +420,41 @@
     dispatch))
 
 
-;;; creates a simple menu with 2 options
-(define (menu-adt window options)
-  (let*
-    ((pointer ((window 'pointer-id)))
-     (start   ((window 'start-id)))
-     (exit    ((window 'exit-id)))
-     ;(menu    ((window 'menu-id)))
+(struct item (name proc))
 
-     ;; coordinates for menu items
-     (pointer-x 1/4)
-     (pointer-y 2/5)
-     (start-x   1/3)
-     (start-y   2/5)
-     (exit-x    1/3)
-     (exit-y    1/2)
+;;; creates a simple menu with 2 options
+(define (menu-adt window . items)
+  (let*
+    ((pointer (item  '> void))
+     (pointer-id ((window 'item-id) (item-name pointer)))
+     (items (list->vector items))
+     (ids (vector-map (lambda (item) ((window 'item-id) (item-name item))) items))
+     (number-of-items (vector-length items))
 
      (position 0)
      (position!
-       (lambda (+/-)
-         (set! position (modulo (+/- position 1) (vector-length options)))))
+       (lambda (direction)
+         (set! position
+           (modulo (+ position (if (eq? direction 'up) 1 -1))
+                   number-of-items))))
 
      ;; draw function, draws every item
      (draw!
        (lambda ()
-         ((window 'draw!) pointer pointer-x pointer-y)
-         ((window 'draw!) start start-x start-y)
-         ((window 'draw!) exit exit-x exit-y)))
+         (do ((i 0   (+ i 1))
+              (y 1/4 (+ y 1/12)))
+           ((= i number-of-items) (void))
+           (when (= i position)
+             ((window 'draw!) pointer-id 1/4 y))
+           ((window 'draw!) (vector-ref ids i) 1/3 y))))
 
      ;; functions to interact with the pointer
      ;; should be switched to something more generic when new items get added
      (input!
        (lambda (key)
          (case key
-           ((up) (position! -) (set! pointer-y start-y))
-           ((down) (position! +) (set! pointer-y exit-y))
-           ((#\return) ((vector-ref options position))))))
+           ((up down) (position! key))
+           ((#\return) ((item-proc (vector-ref items position)))))))
 
      (hide
        (window 'hide-menu))
@@ -478,6 +482,7 @@
 (define (main (name "Main") (random? #f))
   (let*
     ((window (window-adt name))
+     (scale 1)
 
      ;; boolean that changes to #f after user input in menu
      ;; and #t after a call to draw!
@@ -514,7 +519,8 @@
          (set! state 'menu))
 
      ;; creates a menu
-     (define menu (menu-adt window (vector start exit)))
+     (define menu (menu-adt window (item 'START start)
+                                   (item 'EXIT  exit)))
 
      ;; function that processes key press events
      ;; results depend on current state

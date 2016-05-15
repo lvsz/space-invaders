@@ -36,33 +36,10 @@
      (type-from-id car)
      (tile-from-id cdr)
 
-     ;; ids are cons cells with their type and bitmap-tile
-     ;; id for menu background
-     (menu-id
-       (lambda ()
-         (let ((tile (make-tile 224 256 #f #f)))
-           ((tile 'draw-rectangle) 0 0 224 256 "black")
-           ((menu-layer 'add-drawable) tile)
-           (cons 'menu tile))))
-
-     ;; id for menu pointer
-     (pointer-id
-       (lambda ()
-         (let ((tile (text-tile ">")))
-           ((menu-layer 'add-drawable) tile)
-           (cons 'menu tile))))
-
-     ;; id for the menu's start item
-     (start-id
-       (lambda ()
-         (let ((tile (text-tile "START")))
-           ((menu-layer 'add-drawable) tile)
-           (cons 'menu tile))))
-
-     ;; id for the menu's exit item
-     (exit-id
-       (lambda ()
-         (let ((tile (text-tile "EXIT")))
+     ;; ids are cons cells with their type and tile
+     (item-id
+       (lambda (name)
+         (let ((tile (text-tile (symbol->string name))))
            ((menu-layer 'add-drawable) tile)
            (cons 'menu tile))))
 
@@ -175,10 +152,7 @@
            ((draw!)      draw!)
            ((remove!)    remove!)
            ((animate!)   animate!)
-           ((menu-id)    menu-id)
-           ((pointer-id) pointer-id)
-           ((start-id)   start-id)
-           ((exit-id)    exit-id)
+           ((item-id)    item-id)
            ((invader-id) invader-id)
            ((player-id)  player-id)
            ((bullet-id)  bullet-id)

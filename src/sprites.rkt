@@ -13,8 +13,8 @@
 
 (define · #f)
 (define █ #t)
-(define max-text-size 52)
-(define default-font-size 12)
+(define max-text-size 120)
+(define default-font-size 14)
 
 (struct sprite (width height vector))
 
@@ -143,7 +143,7 @@
 
 (define (text-tile text (color "white"))
   (let ((tile (make-tile max-text-size default-font-size #f #f)))
-    ((tile 'draw-text) text 12 0 0 color)
+    ((tile 'draw-text) text default-font-size 0 0 color)
     tile))
 
 (define (player-tile)
