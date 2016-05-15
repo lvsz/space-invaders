@@ -6,7 +6,8 @@
          "invaders.rkt"
          "bunkers.rkt")
 
-(define hi-score-file "../Resources/hi-score")
+(define game-dir (build-path (find-system-path 'doc-dir) "Space Invaders/"))
+(define hi-score-file (build-path game-dir "hi-score"))
 
 ;; time between updates in miliseconds
 (define player-speed 30)
@@ -339,8 +340,8 @@
     (define (on-finish score victory?)
       (when (> score hi-score)
         (set! hi-score score)
-        (unless (directory-exists? "../Resources")
-          (make-directory "../Resources"))
+        (unless (directory-exists? game-dir)
+          (make-directory game-dir))
         (call-with-output-file hi-score-file
                                (lambda (out) (write score out))
                                #:mode 'text
