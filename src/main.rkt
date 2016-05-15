@@ -270,62 +270,78 @@
      (updated #f)
      (updated? (lambda () updated))
 
+     ;; to see if menu needs to change to pause-menu
+     (first-pause #t)
+
      ;; keeps track of the current state (e.g. menu or game)
      (state 'menu)
 
      ;; creates a new game
      (game (new-game window random?)))
 
-      (define (menu-loop delta-t)
-         (unless (updated?)
-           (set! updated #t)
-           ((menu 'draw!))))
+    (define (menu-loop delta-t)
+      (unless (updated?)
+        (set! updated #t)
+        ((menu 'draw!))))
 
-     ;; starts the game by clearing the menu and changing the loop function
-     (define (start)
-         (set! state 'game)
-         ((menu 'hide))
-         ((game 'unhide))
-         ((window 'set-game-loop-fun!) (game 'game-loop)))
+    ;; starts the game by clearing the menu and changing the loop function
+    (define (start)
+      (set! state 'game)
+      ((menu 'hide))
+      ((game 'unhide))
+      ((window 'set-game-loop-fun!) (game 'game-loop)))
 
-     ;; stops the game by clearing the screen, changing the loop function
-     ;; also creates a new menu and deletes the old game
-     (define (stop)
-         ((game 'hide))
-         ((game 'clear-input!))
-         ((menu 'unhide))
-         ((window 'set-game-loop-fun!) menu-loop)
-         (set! updated #f)
-         (set! state 'menu))
+    (define continue
+      start)
 
-     ;; functions that resize the window
-     (define (zoom-in)
-       ((window 'scale!) +))
-     (define (zoom-out)
-       ((window 'scale!) -))
+    ;; stops the game by clearing the screen, changing the loop function
+    ;; also creates a new menu and deletes the old game
+    (define (stop)
+      ((game 'hide))
+      ((game 'clear-input!))
+      ((menu 'unhide))
+      (when first-pause
+      ((menu 'clear!))
+        (set! first-pause #f)
+        (set! menu (menu-adt window
+                             (item 'CONTINUE continue)
+                             (item 'EXIT  exit)
+                             (item 'ZOOM_IN zoom-in)
+                             (item 'ZOOM_OUT zoom-out))))
+      ((window 'set-game-loop-fun!) menu-loop)
+      (set! updated #f)
+      (set! state 'menu))
 
-     ;; creates a menu
-     (define menu (menu-adt window (item 'START start)
-                                   (item 'EXIT  exit)
-                                   (item 'ZOOM_IN zoom-in)
-                                   (item 'ZOOM_OUT zoom-out)))
+    ;; functions that resize the window
+    (define (zoom-in)
+      ((window 'scale!) +))
+    (define (zoom-out)
+      ((window 'scale!) -))
 
-     ;; function that processes key press events
-     ;; results depend on current state
-     (define (key-fun key)
-         (if (eq? state 'game)
-           (case key
-             ((escape) (stop))
-             (else ((game 'input!) key #t)))
-           (case key
-             ((escape) (exit))
-             (else (set! updated #f) ((menu 'input!) key)))))
+    ;; creates a menu
+    (define menu (menu-adt window
+                           (item 'START start)
+                           (item 'EXIT  exit)
+                           (item 'ZOOM_IN zoom-in)
+                           (item 'ZOOM_OUT zoom-out)))
 
-     ;; function that processes key release events
-     ;; currently only usefull in game mode
-     (define (release-fun key)
-         (when (eq? state 'game)
-           ((game 'input!) key #f)))
+
+    ;; function that processes key press events
+    ;; results depend on current state
+    (define (key-fun key)
+      (if (eq? state 'game)
+        (case key
+          ((escape) (stop))
+          (else ((game 'input!) key #t)))
+        (case key
+          ((escape) (exit))
+          (else (set! updated #f) ((menu 'input!) key)))))
+
+    ;; function that processes key release events
+    ;; currently only usefull in game mode
+    (define (release-fun key)
+      (when (eq? state 'game)
+        ((game 'input!) key #f)))
 
     ;; calls these three functions to draw a window with a menu
     ((game 'hide))
