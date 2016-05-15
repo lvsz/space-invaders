@@ -17,8 +17,6 @@
 
 (define (x->bunker-x x offset)
   (/ (- x offset) unit-width))
-(define (y->bunker-y y)
-  (round (/ (- y bunker-y) unit-height)))
 
 (define bunker-bitmap 
   (let ((· #f)
@@ -55,9 +53,10 @@
               (vector-ref bitmap (+ x (* bitmap-width y))))))
      (shot!
        (lambda (x direction)
-         (let-values (((start end next y) (if (eq? direction 'up)
-                                          (values (- bitmap-height 1) -1 -1 #f)
-                                          (values 0 bitmap-height 1 #f))))
+         (let-values (((start end next y)
+                       (if (eq? direction 'up)
+                         (values (- bitmap-height 1) -1 -1 #f)
+                         (values 0 bitmap-height 1 #f))))
          (if (let loop ((i start))
                (cond ((= i end) #f)
                      ((bit? x i) (set! y i))
@@ -66,14 +65,14 @@
              (vector-set! bitmap (+ x (* bitmap-width y)) #f)
              (when (bit? x (+ y next))
                (vector-set! bitmap (+ x (* bitmap-width (+ y next))) #f))
-             (let loop ((i (- x 2)) (j (- y 2)))
+             (let loop ((i (- x 3)) (j (- y 3)))
                (when (and (bit? i j)
                           (zero? (random (+ 1 (abs (- i x)) (abs (- j y))))))
                  (vector-set! bitmap (+ i (* bitmap-width j)) #f))
-               (cond ((= j (+ y 1))
+               (cond ((= j (+ y 2))
                       (set! updated? #f))
-                     ((= i (+ x 1))
-                      (loop (- x 2) (+ j 1)))
+                     ((= i (+ x 2))
+                      (loop (- x 3) (+ j 1)))
                      (else
                        (loop (+ i 1) j)))))
            #f))))
