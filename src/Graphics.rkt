@@ -174,22 +174,11 @@
                    [just-once? #t]))))
 
     ;; doubles the window width for multiplayer games
-    (define mp #f)
     (define scale 1)
-    (define (mp-window)
-      (let ((new-w (* w scale 2))
+    (define (set-w width)
+      (let ((new-w (* width scale))
             (new-h (* h scale)))
-        (set! mp #t)
-        (send frame min-width new-w)
-        (set! buffer-bitmap (make-object bitmap% new-w new-h))
-        (send buffer-bitmap-dc set-bitmap buffer-bitmap)
-        (send buffer-bitmap-dc set-scale scale scale)))
-
-    ;; resets the window for single player
-    (define (sp-window)
-      (let ((new-w (* w scale))
-            (new-h (* h scale)))
-        (set mp #f)
+        (set! w width)
         (send frame min-width new-w)
         (set! buffer-bitmap (make-object bitmap% new-w new-h))
         (send buffer-bitmap-dc set-bitmap buffer-bitmap)
@@ -198,7 +187,7 @@
     ;; scales the window with a valid fractional
     ;; can't figure out how to resize the window after zooming out though
     (define (set-scale n)
-      (let ((new-w (* w n (if mp 2 1)))
+      (let ((new-w (* w n))
             (new-h (* h n)))
         (set! scale n)
         (send frame min-width new-w)
@@ -215,8 +204,7 @@
             ((eq? msg 'set-update-callback!) (lambda (gl) (set! update-callback gl)))
             ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
             ((eq? msg 'set-scale) set-scale)
-            ((eq? msg 'mp-window) mp-window)
-            ((eq? msg 'sp-window) sp-window)
+            ((eq? msg 'set-w) set-w)
             (else (raise-arguments-error 'window
                                          "wrong message sent"
                                          "message"

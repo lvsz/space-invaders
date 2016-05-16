@@ -159,13 +159,13 @@
 ;; generates a tile from a given string
 ;; if no color is given, white is used
 (define (text-tile text (color "white"))
-  (let ((tile (make-tile max-text-size default-font-size #f #f)))
+  (let ((tile (make-tile max-text-size (+ default-font-size 2) #f #f)))
     ((tile 'draw-text) text default-font-size 0 0 color)
     tile))
 
 ;; below are the tiles used in-game
 (define (score-tile text)
-  (let ((tile (make-tile max-text-size 12 #f #f)))
+  (let ((tile (make-tile max-text-size 14 #f #f)))
     ((tile 'draw-text) text 12 0 0 "white")
     tile))
 

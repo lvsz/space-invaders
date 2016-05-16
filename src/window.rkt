@@ -144,12 +144,12 @@
      (singleplayer
        (lambda ()
          (for-each (lambda (layer) ((layer 'resize!) width height)) all-layers)
-         ((window 'sp-window))))
+         ((window 'set-w) width)))
 
      (multiplayer
        (lambda ()
          (for-each (lambda (layer) ((layer 'resize!) (* width 2) height)) all-layers)
-         ((window 'mp-window))))
+         ((window 'set-w) (* 2 width))))
 
      ;; sets the main loop function
      (set-game-loop-fun!
