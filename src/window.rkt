@@ -14,8 +14,8 @@
 (define window-height 256)
 
 ;; with standard settings, 1 unit = 1 pixel
-(define unit-width  1/224)
-(define unit-height 1/256)
+(define unit-width  (/ 1 window-width))
+(define unit-height (/ 1 window-height))
 
 ;;; adt for the window, which connects the game to the graphics library
 ;;; requires a name and optionally non-standard dimensions
@@ -34,6 +34,7 @@
                         bullet-layer
                         invader-layer
                         bunker-layer))
+     (all-layers (apply list menu-layer text-layer game-layers))
 
      ;; accessors for ids
      (type-from-id car)
@@ -64,8 +65,8 @@
 
      ;; id for the player's ship
      (player-id
-       (lambda ()
-         (let ((tile (player-tile)))
+       (lambda ((color "cyan"))
+         (let ((tile (player-tile color)))
            ((player-layer 'add-drawable) tile)
            (cons 'player tile))))
 
@@ -140,6 +141,16 @@
                (set! scale new-scale)
                ((window 'set-scale) scale))))))
 
+     (singleplayer
+       (lambda ()
+         (for-each (lambda (layer) ((layer 'resize!) width height)) all-layers)
+         ((window 'sp-window))))
+
+     (multiplayer
+       (lambda ()
+         (for-each (lambda (layer) ((layer 'resize!) (* width 2) height)) all-layers)
+         ((window 'mp-window))))
+
      ;; sets the main loop function
      (set-game-loop-fun!
        (lambda (proc)
@@ -193,6 +204,8 @@
            ((player-id)  player-id)
            ((bullet-id)  bullet-id)
            ((bunker-id)  bunker-id)
+           ((multiplayer)          multiplayer)
+           ((singleplayer)         singleplayer)
            ((set-key-fun!)         set-key-fun!)
            ((set-key-release-fun!) set-key-release-fun!)
            ((set-game-loop-fun!)   set-game-loop-fun!)

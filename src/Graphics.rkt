@@ -125,8 +125,8 @@
     ;; ###### public methods for the window ADT ####################
     ;; #############################################################
     ;;Create and add layers to the window
-    (define (add-layer)
-      (define layer (make-layer w h canvas))
+    (define (add-layer (width w) (height h))
+      (define layer (make-layer width height canvas))
       (set! layers (append layers (list layer)))
       layer)
 
@@ -173,11 +173,34 @@
                    [interval (calculate-interval) ]
                    [just-once? #t]))))
 
+    ;; doubles the window width for multiplayer games
+    (define mp #f)
+    (define scale 1)
+    (define (mp-window)
+      (let ((new-w (* w scale 2))
+            (new-h (* h scale)))
+        (set! mp #t)
+        (send frame min-width new-w)
+        (set! buffer-bitmap (make-object bitmap% new-w new-h))
+        (send buffer-bitmap-dc set-bitmap buffer-bitmap)
+        (send buffer-bitmap-dc set-scale scale scale)))
+
+    ;; resets the window for single player
+    (define (sp-window)
+      (let ((new-w (* w scale))
+            (new-h (* h scale)))
+        (set mp #f)
+        (send frame min-width new-w)
+        (set! buffer-bitmap (make-object bitmap% new-w new-h))
+        (send buffer-bitmap-dc set-bitmap buffer-bitmap)
+        (send buffer-bitmap-dc set-scale scale scale)))
+
     ;; scales the window with a valid fractional
     ;; can't figure out how to resize the window after zooming out though
     (define (set-scale n)
-      (let* ((new-w (* w n))
-             (new-h (* h n)))
+      (let ((new-w (* w n (if mp 2 1)))
+            (new-h (* h n)))
+        (set! scale n)
         (send frame min-width new-w)
         (send frame min-height new-h)
         (set! buffer-bitmap (make-object bitmap% new-w new-h))
@@ -192,6 +215,8 @@
             ((eq? msg 'set-update-callback!) (lambda (gl) (set! update-callback gl)))
             ((eq? msg 'set-key-release-callback!) (lambda (eh) (set! key-release-callback eh)))
             ((eq? msg 'set-scale) set-scale)
+            ((eq? msg 'mp-window) mp-window)
+            ((eq? msg 'sp-window) sp-window)
             (else (raise-arguments-error 'window
                                          "wrong message sent"
                                          "message"
@@ -676,6 +701,11 @@
       (set! drawables '())
       (redraw))
 
+    (define (resize! new-w new-h)
+      (set! w new-w)
+      (set! h new-h)
+      (redraw))
+
     ;; # dispatch
     (define (dispatch msg)
       (cond ((eq? msg 'add-drawable)  add-drawable)
@@ -684,6 +714,7 @@
             ((eq? msg 'hide) hide)
             ((eq? msg 'unhide) unhide)
             ((eq? msg 'clear!) clear!)
+            ((eq? msg 'resize!) resize!)
             (else (raise-arguments-error 'layer
                                          "wrong message sent"
                                          "message"

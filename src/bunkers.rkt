@@ -18,9 +18,7 @@
 ;; spacing between bunkers
 (define spacing (* unit-width 24))
 ;; height on screen of bunkers
-(define bunker-y (* unit-width 192))
-;; number of bunkers
-(define number-of-bunkers 4)
+(define bunker-y (* unit-height 192))
 
 ;; converts an x coordinate of the window
 ;; to a corresponding location in the bitmap
@@ -120,7 +118,7 @@
 
 
 ;;; ADT for all bunkers, gets provided to main.rkt
-(define (bunkers-adt make-id)
+(define (bunkers-adt make-id (number-of-bunkers 4))
   (let*
     (;; build the bunkers
      (bunker-list

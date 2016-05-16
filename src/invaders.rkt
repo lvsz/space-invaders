@@ -4,8 +4,6 @@
 
 (provide swarm-adt)
 
-(define invaders/column 5)
-(define invaders/row 11)
 (define invader-width (* 12 unit-width))
 (define invader-height (* 8 unit-height))
 
@@ -39,6 +37,7 @@
     ;; identifier to store state needed by the window adt
     ((id (make-id type))
 
+     ;; they die after 1 shot
      (health 1)
 
      ;; points upon killing are based on initial health
@@ -113,7 +112,7 @@
 
 ;;; adt that stores a 1 dimensional vector of invaders
 ;;; requires everything a single invader needs, plus a x coordinate
-(define (invader-column x y make-id)
+(define (invader-column x y make-id invaders/column)
   (let*
     (;; the invaders are stored in a vector
      ;; builds it using the invader-adt from above
@@ -219,9 +218,11 @@
 
 
 ;;; swarm-adt is a row of invader-columns
-(define (swarm-adt make-id)
+(define (swarm-adt make-id invaders/row invaders/column (mp #f))
   (let* ((x 0)
          (y 1/7)
+         (left-border 0)
+         (right-border (if mp 2 1))
 
          (game-over #f)
 
@@ -230,7 +231,7 @@
                    invaders/row
                    (lambda (i)
                      ;; calculates spacing between columns
-                     (invader-column (+ x (* i horizontal-spacing)) y make-id))))
+                     (invader-column (+ x (* i horizontal-spacing)) y make-id invaders/column))))
 
          ;; left column
          (left 0)
@@ -261,12 +262,12 @@
                  (loop (- (random (+ left 1) (+ right 2)) 1))))))
 
          ;; intitial speed depends on amount of invaders
-         (speed (* invaders/column invaders/row 16))
+         (speed (* invaders/column invaders/row 12))
 
          ;; changes speed
          (speed!
            (lambda ()
-             (set! speed (- speed 8))))
+             (set! speed (- speed 12))))
 
          ;; checks from left to right if any bullet can hit something
          (shot!
@@ -328,12 +329,12 @@
                  ; direction can only change when touching the side of the screen
                  (cond
                    ; when left column touches left side of screen
-                   ((<= left-bound 0)
+                   ((<= left-bound left-border)
                     (if down
                       (set!-values (down direction) (values #f 'down))
                       (set!-values (down direction) (values #t 'right))))
                    ; when right column touches right side of screen
-                   ((>= right-bound 1)
+                   ((>= right-bound right-border)
                     (if down
                       (set!-values (down direction) (values #f 'down))
                       (set!-values (down direction) (values #t 'left)))))
@@ -348,7 +349,7 @@
          (dispatch
            (lambda (msg)
              (case msg
-               ((x-bounds) (values 0 1))
+               ((x-bounds) (values left-border right-border))
                ((y-bounds) (values 1 0))
                ((shoot) (shoot))
                ((speed) speed)

@@ -13,17 +13,19 @@
 ;;; id and make-id are objects provided by window.rkt
 ;;; they are used to generate and save a unique identifier
 ;;; and graphical representation for every instantiation
-(define (player-adt make-id)
+(define (player-adt id (mp #f))
   (let*
-    ((id (make-id))
-
-     ;; player lives
+    (;; player lives
      ;; game over when hit with 0 left
      (lives 3)
+     (active #t)
+     (alive?
+       (lambda ()
+         (positive? lives)))
 
      ;; default X and Y positions
-     (x (- 1/2 (/ player-width 2)))
-     (y 19/20)
+     (x (- (if mp mp 1) 1/2 (/ player-width 2)))
+     (y 9/10)
 
      ;; bounds of the player's hitbox
      ;; gets called for collision checking
@@ -40,33 +42,38 @@
      ;; second one is true if the game ends, false otherwise
      (shot!
        (lambda (x y)
-         (set! lives (- lives 1))
-         (if (zero? lives)
-           ; bullet hit and game over
-           (values #t #t)
-           ; bullet hit, lost a life, game continues
-           (values #t #f))))
+         (if active
+           (begin
+             (set! lives (- lives 1))
+             (if (zero? lives)
+               ; bullet hit and game over
+               (values #t #t)
+               ; bullet hit, lost a life, game continues
+               (values #t #f)))
+           (values #f #f))))
 
      ;; moves the ship within the window's limits
      ;; only takes the symbols 'left and 'right as arguments
      ;; others get ignored
      (move!
-       (let ((difference (* 2 unit-width))
-             (left-border 0)
-             (right-border (- 1 player-width)))
-         (lambda (direction)
-           (cond
-             ; ship isn't touching right border, and it's going right
-             ((and (eq? direction 'right) (< x right-border))
-              (set! x (+ x difference)))
-             ; ship isn't touching left border, and it's going left
-             ((and (eq? direction 'left) (> x left-border))
-              (set! x (- x difference)))))))
+       (let ((difference unit-width))
+         (lambda (direction (left-border 0) (right-border 1))
+           (when active
+             (cond
+               ; ship isn't touching right border, and it's going right
+               ((and (eq? direction 'right) (< (+ x player-width) right-border))
+                (set! x (+ x difference)))
+               ; ship isn't touching left border, and it's going left
+               ((and (eq? direction 'left) (> x left-border))
+                (set! x (- x difference))))))))
 
      ;; sends draw message with id and coordinates to window adt
      (draw!
        (lambda (window)
-         ((window 'draw!) id x y)))
+         (if (alive?)
+           ((window 'draw!) id x y)
+           (begin ((window 'remove!) id)
+                  (set! active #f)))))
 
      (dispatch
        (lambda (msg)
@@ -75,6 +82,7 @@
            ((y) y)
            ((x-bounds) (x-bounds))
            ((y-bounds) (y-bounds))
+           ((alive?)   (alive?))
            ((shot!)      shot!)
            ((move!)      move!)
            ((draw!)      draw!)

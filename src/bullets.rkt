@@ -29,11 +29,11 @@
      ;; calculates the needed movements
      ;; based on who shot it
      (move
-       (if (eq? type 'player)
+       (if (eq? type 'invader)
          (lambda (y)
-           (- y (* 2 bullet-height)))
+           (+ y (* 3/2 bullet-height)))
          (lambda (y)
-           (+ y (* 3/2 bullet-height)))))
+           (- y (* 2 bullet-height)))))
 
      ;; moves the bullet when active
      (move!
