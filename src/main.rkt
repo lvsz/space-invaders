@@ -1,13 +1,12 @@
 #lang racket
 
 (require "window.rkt"
-	     "player.rkt"
-		 "bullets.rkt"
+         "player.rkt"
+         "bullets.rkt"
          "invaders.rkt"
          "bunkers.rkt")
 
-(define game-dir (build-path (find-system-path 'doc-dir) "Space Invaders/"))
-(define hi-score-file (build-path game-dir "hi-score"))
+(define hi-score-file "../Resources/hi-score")
 
 ;; time between updates in miliseconds
 (define player-speed 30)
@@ -136,9 +135,14 @@
            ((invaders 'move!))
            ; generates a random integer
            ; success varies from 0 to 100% depending on invader-shoot-chance
-           (when (> invader-shoot-chance (random 100))
-             (let-values (((x y) (invaders 'shoot)))
-               ((bullets 'shoot!) 'invader x y)))
+           (let loop ((xs '()))
+             (when (> invader-shoot-chance (random 100))
+               (let-values (((x y) (invaders 'shoot)))
+                 (unless (member x xs)
+                   ((bullets 'shoot!) 'invader x y)
+                   (thread (lambda ()
+                             (sleep 1/5)
+                             (loop (cons x xs))))))))
            (set! invader-time 0)
            ((invaders 'draw!) window))
 
@@ -206,7 +210,7 @@
                "given" msg))))))
     dispatch))
 
-	
+
 ;; simple struct to store menu-items
 (struct item (name proc))
 
@@ -340,8 +344,8 @@
     (define (on-finish score victory?)
       (when (> score hi-score)
         (set! hi-score score)
-        (unless (directory-exists? game-dir)
-          (make-directory game-dir))
+        (unless (directory-exists? "../Resources")
+          (make-directory "../Resources"))
         (call-with-output-file hi-score-file
                                (lambda (out) (write score out))
                                #:mode 'text
