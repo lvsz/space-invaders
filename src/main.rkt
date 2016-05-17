@@ -1,6 +1,7 @@
 #lang racket
 
-(require "window.rkt"
+(require racket/gui/base
+         "window.rkt"
 	     "player.rkt"
 		 "bullets.rkt"
          "invaders.rkt"
@@ -10,8 +11,8 @@
 (define hi-score-file (build-path game-dir "hi-score"))
 
 ;; time between updates in miliseconds
-(define player-speed 15)
-(define bullet-speed 15)
+(define player-speed 10)
+(define bullet-speed 10)
 
 ;; time it takes for the player to reload in miliseconds
 (define reload-timer 600)
@@ -33,6 +34,16 @@
      (bullets  (bullets-adt (window 'bullet-id)))
      (invaders (swarm-adt   (window 'invader-id) invaders/row invaders/column))
      (bunkers  (bunkers-adt (window 'bunker-id)))
+     (lives    (build-list (player 'lives)
+                           (lambda (_)
+                             ((window 'life-id)))))
+
+     (update-lives
+       (lambda ()
+         (do ((x (/ player-width 2) (+ x (* player-width 3/2)))
+              (life lives (cdr life)))
+           ((null? life))
+           ((window 'draw!) (car life) x 19/20))))
 
      ;; keeps the score of the current game
      (score 0)
@@ -185,11 +196,16 @@
                           ; score to be added for killing an invader
                           (when shot
                             ((b 'explode!))
-                            (when (eq? type 'player)
-                              (set! score (+ score shot))
-                              ((window 'remove!) score-id)
-                              (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
-                              ((window 'draw!) score-id 0 0))
+                            (if (eq? type 'player)
+                              (begin (set! score (+ score shot))
+                                     ((window 'remove!) score-id)
+                                     (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
+                                     ((window 'draw!) score-id 0 0))
+                              (unless (null? lives)
+                                (bell)
+                                ((window 'remove!) (car lives))
+                                (set! lives (cdr lives))
+                                (update-lives)))
                             ; if the bullet caused the end of the game
                             ; the side that shot it wins
                             (when game-over
@@ -214,16 +230,32 @@
                'game-loop
                "invalid argument"
                "given" msg))))))
+    (update-lives)
     dispatch))
 
 ;;; very similar to the code above, but for multiplayer
 (define (new-mp-game window on-finish random?)
   (let*
-    ((player-1 (player-adt  ((window 'player-id) "cyan")    1))
-     (player-2 (player-adt  ((window 'player-id) "magenta") 2))
+    ((player-1 (player-adt  ((window 'player-id) "cyan") 'player-1 1))
+     (player-2 (player-adt  ((window 'player-id) "magenta") 'player-2 2))
      (bullets  (bullets-adt (window 'bullet-id)))
      (invaders (swarm-adt   (window 'invader-id) (* 2 invaders/row) invaders/column #t))
      (bunkers  (bunkers-adt (window 'bunker-id) 9))
+     (lives-1  (build-list
+                 (player-1 'lives)
+                 (lambda (_)
+                   ((window 'life-id) "cyan"))))
+     (lives-2  (build-list
+                 (player-2 'lives)
+                 (lambda (_)
+                   ((window 'life-id) "magenta"))))
+
+     (update-lives
+       (lambda (lives base-x)
+         (do ((x (+ base-x (/ player-width 2)) (+ x (* player-width 3/2)))
+              (life lives (cdr life)))
+           ((null? life))
+           ((window 'draw!) (car life) x 19/20))))
 
      ;; keeps the score of the current game
      (score-1 0)
@@ -312,16 +344,27 @@
                ; score to be added for killing an invader
                (when shot
                  ((bullet 'explode!))
-                 (when (eq? (bullet 'type) 'player-1)
-                   (set! score-1 (+ score-1 shot))
-                   ((window 'remove!) score-1-id)
-                   (set! score-1-id ((window 'score-id) (format "PLAYER 1: ~a" score-1)))
-                   ((window 'draw!) score-1-id 0 0))
-                 (when (eq? (bullet 'type) 'player-2)
-                   (set! score-2 (+ score-2 shot))
-                   ((window 'remove!) score-2-id)
-                   (set! score-2-id ((window 'score-id) (format "PLAYER 2: ~a" score-2)))
-                   ((window 'draw!) score-2-id 1 0))
+                 (cond 
+                   ((eq? (bullet 'type) 'player-1)
+                    (set! score-1 (+ score-1 shot))
+                    ((window 'remove!) score-1-id)
+                    (set! score-1-id ((window 'score-id) (format "PLAYER 1: ~a" score-1)))
+                    ((window 'draw!) score-1-id 0 0))
+                   ((eq? (bullet 'type) 'player-2)
+                    (set! score-2 (+ score-2 shot))
+                    ((window 'remove!) score-2-id)
+                    (set! score-2-id ((window 'score-id) (format "PLAYER 2: ~a" score-2)))
+                    ((window 'draw!) score-2-id 1 0))
+                   ((eq? (target 'name) 'player-1)
+                    (bell)
+                    ((window 'remove!) (car lives-1))
+                    (set! lives-1 (cdr lives-1))
+                    (update-lives lives-1 0))
+                   ((eq? (target 'name) 'player-2)
+                    (bell)
+                    ((window 'remove!) (car lives-2))
+                    (set! lives-2 (cdr lives-2))
+                    (update-lives lives-2 1)))
                  ; if the bullet caused the end of the game
                  ; the side that shot it wins
                  (when game-over
@@ -363,11 +406,11 @@
            (set! loaded-2 #t))
 
          ;; when shooting, shoot
-         (when (and loaded-1 shooting-1)
+         (when (and loaded-1 shooting-1 (player-1 'alive?))
            (set! loaded-1 #f)
            (set! reload-time-1 0)
            (shoot! player-1 'player-1))
-         (when (and loaded-2 shooting-2)
+         (when (and loaded-2 shooting-2 (player-2 'alive?))
            (set! loaded-2 #f)
            (set! reload-time-2 0)
            (shoot! player-2 'player-2))
@@ -450,13 +493,15 @@
                "given" msg))))))
     ((window 'draw!) score-1-id 0 0)
     ((window 'draw!) score-2-id 1 0)
+    (update-lives lives-1 0)
+    (update-lives lives-2 1)
     dispatch))
 
 
 ;; simple struct to store menu-items
 (struct item (name proc))
 
-;;; creates a simple menu with 2 options
+;;; creates a simple menu from the givem items
 (define (menu-adt window hi-score . items)
   (let*
     ((pointer-id ((window 'item-id) '>))

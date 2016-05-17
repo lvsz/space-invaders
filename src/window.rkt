@@ -70,6 +70,12 @@
            ((player-layer 'add-drawable) tile)
            (cons 'player tile))))
 
+     (life-id
+       (lambda ((color "cyan"))
+         (let ((tile (player-tile color)))
+           ((score-layer 'add-drawable) tile)
+           (cons 'score tile))))
+
      ;; id for bullets
      (bullet-id
        (lambda ()
@@ -199,6 +205,7 @@
            ((scale!)     scale!)
            ((item-id)    item-id)
            ((text-id)    text-id)
+           ((life-id)    life-id)
            ((score-id)   score-id)
            ((invader-id) invader-id)
            ((player-id)  player-id)

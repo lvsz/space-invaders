@@ -13,7 +13,7 @@
 ;;; id and make-id are objects provided by window.rkt
 ;;; they are used to generate and save a unique identifier
 ;;; and graphical representation for every instantiation
-(define (player-adt id (mp #f))
+(define (player-adt id (name 'player) (mp #f))
   (let*
     (;; player lives
      ;; game over when hit with 0 left
@@ -80,6 +80,8 @@
          (case msg
            ((x) x)
            ((y) y)
+           ((name)  name)
+           ((lives) lives)
            ((x-bounds) (x-bounds))
            ((y-bounds) (y-bounds))
            ((alive?)   (alive?))
