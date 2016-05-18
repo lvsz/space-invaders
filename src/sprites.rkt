@@ -169,7 +169,7 @@
     ((tile 'draw-text) text 12 0 0 "white")
     tile))
 
-(define (player-tile (color "cyan"))
+(define (player-tile color)
   (sprite->tile player color))
 
 (define (bullet-tile)
