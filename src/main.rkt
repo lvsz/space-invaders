@@ -1,7 +1,6 @@
 #lang racket
 
-(require racket/gui/base
-         "window.rkt"
+(require "window.rkt"
 	     "player.rkt"
 		 "bullets.rkt"
          "invaders.rkt"
@@ -202,7 +201,6 @@
                                      (set! score-id ((window 'score-id) (format "SCORE: ~a" score)))
                                      ((window 'draw!) score-id 0 0))
                               (unless (null? lives)
-                                (bell)
                                 ((window 'remove!) (car lives))
                                 (set! lives (cdr lives))
                                 (update-lives)))
@@ -344,7 +342,7 @@
                ; score to be added for killing an invader
                (when shot
                  ((bullet 'explode!))
-                 (cond 
+                 (cond
                    ((eq? (bullet 'type) 'player-1)
                     (set! score-1 (+ score-1 shot))
                     ((window 'remove!) score-1-id)
@@ -362,12 +360,10 @@
                     (set! score-1-id ((window 'score-id) (format "PLAYER 1: ~a" score-1)))
                     ((window 'draw!) score-1-id 0 0))
                    ((eq? (target 'name) 'player-1)
-                    (bell)
                     ((window 'remove!) (car lives-1))
                     (set! lives-1 (cdr lives-1))
                     (update-lives lives-1 0))
                    ((eq? (target 'name) 'player-2)
-                    (bell)
                     ((window 'remove!) (car lives-2))
                     (set! lives-2 (cdr lives-2))
                     (update-lives lives-2 1)))
@@ -581,8 +577,8 @@
 
      ;; keeps track of the current state (e.g. menu or game)
      (state 'menu)
-     
-     (hi-score 
+
+     (hi-score
        (if (file-exists? hi-score-file)
          (call-with-input-file hi-score-file (lambda (in) (read in)))
          0)))
